@@ -62,6 +62,12 @@ export interface RunEvent {
   statusUpdate?: RunStatusUpdate;
 }
 
+export interface RunPreview {
+  argv: string[];
+  /** Shell-style display string for the command preview pane. */
+  display: string;
+}
+
 export interface StartResult {
   runId: string;
   argv: string[];
