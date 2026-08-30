@@ -1,5 +1,32 @@
 /** Shared types crossing the IPC boundary. Everything here must be structured-cloneable. */
 
+export interface Settings {
+  version: 1;
+  /** EDOPro install directory; null until first-run setup completes. */
+  workdir: string | null;
+  /** Per-user --scriptdir overrides, highest priority first. */
+  scriptdirs: string[];
+  solver: {
+    /** Override path to a solver binary/script; null = bundled default. */
+    nativePath: string | null;
+    forceWasm: boolean;
+  };
+  defaults: {
+    solveMs: number;
+    /** null = solver default (all cores). */
+    threads: number | null;
+  };
+}
+
+export interface WorkdirHealth {
+  ok: boolean;
+  workdir: string;
+  cardDbs: string[];
+  scriptRoots: string[];
+  edoproExe: string | null;
+  problems: string[];
+}
+
 /** Common run options shared by every workflow (TDD §6). */
 export interface CommonRunOptions {
   /** Resolved from settings by main when absent. */
