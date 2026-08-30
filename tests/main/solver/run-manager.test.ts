@@ -77,72 +77,73 @@ describe('RunManager', () => {
     });
   });
 
-  describe('stop', () => {
-    it('kills the child and maps the exit to stopped, not failed', () => {
+  describe('log batching', () => {
+    it('batches lines on the flush interval', () => {
+      const { runId } = manager.start(spec);
+      runner.lineCb('out', 'line 1');
+      runner.lineCb('out', 'line 2');
+      expect(events).toHaveLength(0);
+      vi.advanceTimersByTime(60);
+      expect(events).toEqual([{ runId, logBatch: ['line 1', 'line 2'] }]);
+    });
+
+    it('flushes pending lines before the exit event', () => {
+      const { runId } = manager.start(spec);
+      runner.lineCb('out', 'tail line');
+      runner.exitCb(0, null);
+      expect(events[0]).toEqual({ runId, logBatch: ['tail line'] });
+      expect(events[1]?.statusUpdate?.status).toBe('finished');
+    });
+
+    it('writes every line to log.txt', () => {
+      const { logPath } = manager.start(spec);
+      runner.lineCb('out', 'persisted');
+      runner.exitCb(0, null);
+      vi.useRealTimers();
+      // The write stream flushes asynchronously; poll briefly.
+      return vi.waitFor(() => {
+        const log = readFileSync(logPath, 'utf8');
+        expect(log).toContain('$ mock-solver');
+        expect(log).toContain('persisted');
+      });
+    });
+  });
+
+  describe('exit mapping', () => {
+    it('maps exit 0 to finished', () => {
+      manager.start(spec);
+      runner.exitCb(0, null);
+      expect(events.at(-1)?.statusUpdate).toMatchObject({ status: 'finished', exitCode: 0 });
+    });
+
+    it('maps exit 2 to failed with a usage-error message', () => {
+      manager.start(spec);
+      runner.exitCb(2, null);
+      const update = events.at(-1)?.statusUpdate;
+      expect(update?.status).toBe('failed');
+      expect(update?.message).toMatch(/usage error/);
+    });
+
+    it('maps exit 1 to failed with a load/health message', () => {
+      manager.start(spec);
+      runner.exitCb(1, null);
+      expect(events.at(-1)?.statusUpdate?.message).toMatch(/load or health/);
+    });
+
+    it('maps a requested stop to stopped, not failed', () => {
       const { runId } = manager.start(spec);
       manager.stop(runId);
       expect(runner.killed).toBe(true);
       runner.exitCb(null, 'SIGKILL');
       expect(events.at(-1)?.statusUpdate?.status).toBe('stopped');
     });
+  });
 
+  describe('stop', () => {
     it('ignores a stop for an unknown run id', () => {
       manager.start(spec);
       manager.stop('other-run');
       expect(runner.killed).toBe(false);
     });
-  });
-
-  // Log batching and exit mapping span the run lifecycle rather than a
-  // single method, so their tests live directly in RunManager's group.
-
-  it('batches lines on the flush interval', () => {
-    const { runId } = manager.start(spec);
-    runner.lineCb('out', 'line 1');
-    runner.lineCb('out', 'line 2');
-    expect(events).toHaveLength(0);
-    vi.advanceTimersByTime(60);
-    expect(events).toEqual([{ runId, logBatch: ['line 1', 'line 2'] }]);
-  });
-
-  it('flushes pending lines before the exit event', () => {
-    const { runId } = manager.start(spec);
-    runner.lineCb('out', 'tail line');
-    runner.exitCb(0, null);
-    expect(events[0]).toEqual({ runId, logBatch: ['tail line'] });
-    expect(events[1]?.statusUpdate?.status).toBe('finished');
-  });
-
-  it('writes every line to log.txt', () => {
-    const { logPath } = manager.start(spec);
-    runner.lineCb('out', 'persisted');
-    runner.exitCb(0, null);
-    vi.useRealTimers();
-    // The write stream flushes asynchronously; poll briefly.
-    return vi.waitFor(() => {
-      const log = readFileSync(logPath, 'utf8');
-      expect(log).toContain('$ mock-solver');
-      expect(log).toContain('persisted');
-    });
-  });
-
-  it('maps exit 0 to finished', () => {
-    manager.start(spec);
-    runner.exitCb(0, null);
-    expect(events.at(-1)?.statusUpdate).toMatchObject({ status: 'finished', exitCode: 0 });
-  });
-
-  it('maps exit 2 to failed with a usage-error message', () => {
-    manager.start(spec);
-    runner.exitCb(2, null);
-    const update = events.at(-1)?.statusUpdate;
-    expect(update?.status).toBe('failed');
-    expect(update?.message).toMatch(/usage error/);
-  });
-
-  it('maps exit 1 to failed with a load/health message', () => {
-    manager.start(spec);
-    runner.exitCb(1, null);
-    expect(events.at(-1)?.statusUpdate?.message).toMatch(/load or health/);
   });
 });
