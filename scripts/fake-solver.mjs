@@ -8,10 +8,26 @@
 
 const argv = process.argv.slice(2);
 const replay = argv[0] ?? '(no replay)';
-const solveMsIndex = argv.indexOf('--solve-ms');
-const budgetMs = solveMsIndex >= 0 ? Number(argv[solveMsIndex + 1]) : 5000;
+const flagValue = (name) => {
+  const index = argv.indexOf(name);
+  return index >= 0 ? Number(argv[index + 1]) : undefined;
+};
+const budgetMs = flagValue('--solve-ms') ?? 5000;
 const runtimeMs = Math.min(budgetMs, 15_000);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Failure simulation, driven from the GUI's extra-arguments field:
+//   --fake-retry N   report MSG_RETRY N (red health banner path)
+//   --fake-inert     emit an "!! INERT" flag warning
+//   --fake-exit N    exit with code N (2 = usage error, 1 = load/health)
+const fakeRetry = flagValue('--fake-retry') ?? 0;
+const fakeInert = argv.includes('--fake-inert');
+const fakeExit = flagValue('--fake-exit') ?? 0;
+
+if (fakeExit === 2) {
+  console.log('!! unknown option --such-nonsense (simulated by --fake-exit 2)');
+  process.exit(2);
+}
 
 console.log('fake-solver (development stand-in, not the real engine)');
 console.log(`replay: ${replay}`);
@@ -20,12 +36,24 @@ console.log('');
 console.log('loading');
 console.log('  cards             : 13842 from 34 database(s)  (412 ms)');
 console.log('  script dirs       : 12');
+if (fakeInert) console.log('  --burn-limit 3 !! INERT (no --solve: nothing to limit)');
 await sleep(300);
 console.log('');
 console.log('results');
+if (fakeRetry > 0) {
+  console.log(`  answers consumed    : ${284 - fakeRetry} / 284`);
+  console.log(`  MSG_RETRY           : ${fakeRetry}`);
+  console.log('!! replay diverged: card scripts do not match the recording (simulated)');
+  console.log('  self-checks  : FAIL, snapshot stress ok');
+  process.exit(1);
+}
 console.log('  answers consumed    : 284 / 284');
 console.log('  MSG_RETRY           : 0   (faithful replay)');
 console.log('  seed: 888  (--seed 888 to replay)');
+if (fakeExit === 1) {
+  console.log('!! arena init failed (simulated by --fake-exit 1)');
+  process.exit(1);
+}
 console.log('');
 console.log('--- bounded-discrepancy search around the plan ---');
 const start = Date.now();
