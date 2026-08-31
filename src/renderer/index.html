@@ -3,10 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <title>ygo-combo-solver</title>
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
-    />
+    <!-- CSP is set by the main process for packaged builds; a meta CSP
+         here would block the dev server's inline react-refresh preamble. -->
   </head>
   <body>
     <div id="root"></div>
