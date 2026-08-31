@@ -42,13 +42,71 @@ export interface CommonRunOptions {
 }
 
 /**
- * M1 carries verify (bare invocation, the health gate) and optimize
- * (--solve --optimize, the cheaper-line search); M2 adds the remaining
- * kinds per TDD §6.
+ * A card selected via the picker. Always serialized to the solver as
+ * the exact passcode, never the name — the picker resolves names, so
+ * the solver's ambiguous-fragment errors are unreachable from forms
+ * (PRD §5.2.3).
+ */
+export interface CardRef {
+  passcode: number;
+  /** Display only; never sent to the solver. */
+  name: string;
+}
+
+/** A card-picker search hit. */
+export interface CardHit {
+  passcode: number;
+  name: string;
+  typeline: string;
+  isExtraDeck: boolean;
+}
+
+export interface CardIndexStatus {
+  state: 'empty' | 'loading' | 'ready' | 'error';
+  cards: number;
+  databases: number;
+  error?: string;
+}
+
+/**
+ * Target zones for --target (the solver refuses @field as ambiguous
+ * and @extra as not a target zone). Face-down applies to mzone/szone.
+ */
+export type TargetZone = 'mzone' | 'szone' | 'hand' | 'grave' | 'banished';
+
+export interface TargetSpec {
+  card: CardRef;
+  zone: TargetZone;
+  facedown: boolean;
+}
+
+/**
+ * The five MVP workflows (TDD §6): verify (bare invocation, the health
+ * gate), optimize (--solve --optimize), deckhand (--deck/--hand),
+ * board (--no-ref --target ...), fire (--fire/--opp-hand/--guard).
  */
 export type RunSpec =
   | { kind: 'verify'; replay: string; common: CommonRunOptions }
-  | { kind: 'optimize'; replay: string; common: CommonRunOptions };
+  | { kind: 'optimize'; replay: string; common: CommonRunOptions }
+  | { kind: 'deckhand'; replay: string; deck: string; hand: CardRef[]; common: CommonRunOptions }
+  | {
+      kind: 'board';
+      replay: string;
+      deck: string;
+      hand: CardRef[];
+      targets: TargetSpec[];
+      common: CommonRunOptions;
+    }
+  | {
+      kind: 'fire';
+      replay: string;
+      fire: CardRef[];
+      fireSpare: CardRef[];
+      oppHand: CardRef[];
+      /** Raw --guard clauses (advanced grammar; not form-built in M2). */
+      guards: string[];
+      common: CommonRunOptions;
+    };
 
 export type RunStatus = 'running' | 'finished' | 'failed' | 'stopped';
 
@@ -103,6 +161,8 @@ export interface ParsedStatus {
   /** Fatal "!! ..." diagnostics, for the failure explanation. */
   errors: string[];
   solutionsWritten?: { written: number; candidates?: number };
+  /** --fire runs: "=== --fire verdict: N window(s) out of M converted ===". */
+  fireVerdict?: { converted: number; windows: number };
 }
 
 export interface RunSummary {

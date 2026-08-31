@@ -83,6 +83,12 @@ describe('SolverOutputParser', () => {
     expect(status.errors).toHaveLength(1);
   });
 
+  it('reads the fire verdict line', () => {
+    const parser = new SolverOutputParser();
+    parser.feed('=== --fire verdict: 4 window(s) out of 6 converted (3 full board, 1 without the sacrificed card) ===');
+    expect(parser.snapshot().fireVerdict).toEqual({ converted: 4, windows: 6 });
+  });
+
   it('never throws on arbitrary junk lines', () => {
     const parser = new SolverOutputParser();
     for (const junk of ['', '   ', '\t', '💥', '--- ---', '!!', '0 1 2 3', 'MSG_RETRY'])

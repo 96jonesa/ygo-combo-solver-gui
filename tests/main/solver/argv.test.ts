@@ -104,6 +104,80 @@ describe('buildArgv', () => {
     ]);
   });
 
+  it('serializes deckhand with pipe-joined passcode hand', () => {
+    const spec: RunSpec = {
+      kind: 'deckhand',
+      replay: 'ref.yrpX',
+      deck: 'C:\\decks\\Lunalight.ydk',
+      hand: [
+        { passcode: 24094653, name: 'Assault Zone' },
+        { passcode: 14558127, name: 'Ash Blossom & Joyous Spring' },
+        { passcode: 14558127, name: 'Ash Blossom & Joyous Spring' },
+      ],
+      common: {},
+    };
+    expect(buildArgv(spec)).toEqual([
+      'ref.yrpX',
+      '--deck',
+      'C:\\decks\\Lunalight.ydk',
+      '--hand',
+      '24094653|14558127|14558127',
+    ]);
+  });
+
+  it('serializes a described board as --no-ref with explicit target zones', () => {
+    const spec: RunSpec = {
+      kind: 'board',
+      replay: 'template.yrpX',
+      deck: 'd.ydk',
+      hand: [],
+      targets: [
+        { card: { passcode: 54701958, name: 'Liger' }, zone: 'mzone', facedown: false },
+        { card: { passcode: 54701958, name: 'Liger' }, zone: 'mzone', facedown: false },
+        { card: { passcode: 90590304, name: 'Omega' }, zone: 'grave', facedown: false },
+        { card: { passcode: 27204311, name: 'Zone' }, zone: 'szone', facedown: true },
+      ],
+      common: {},
+    };
+    expect(buildArgv(spec)).toEqual([
+      'template.yrpX',
+      '--no-ref',
+      '--deck',
+      'd.ydk',
+      '--target',
+      '54701958@mzone',
+      '--target',
+      '54701958@mzone', // repeats count: two copies on board
+      '--target',
+      '90590304@grave',
+      '--target',
+      '27204311@szone:fd',
+    ]);
+  });
+
+  it('serializes fire with repeatable flags and raw guards', () => {
+    const spec: RunSpec = {
+      kind: 'fire',
+      replay: 'duel.yrpX',
+      fire: [{ passcode: 27204311, name: 'Zone' }],
+      fireSpare: [{ passcode: 63977008, name: 'Junk Signal' }],
+      oppHand: [{ passcode: 27204311, name: 'Nibiru' }],
+      guards: ['5:Crystal Wing|Zalen@field+Junk Signal@hand'],
+      common: {},
+    };
+    expect(buildArgv(spec)).toEqual([
+      'duel.yrpX',
+      '--fire',
+      '27204311',
+      '--fire-spare',
+      '63977008',
+      '--opp-hand',
+      '27204311',
+      '--guard',
+      '5:Crystal Wing|Zalen@field+Junk Signal@hand',
+    ]);
+  });
+
   it('appends extra arguments verbatim, last', () => {
     const spec: RunSpec = {
       kind: 'verify',

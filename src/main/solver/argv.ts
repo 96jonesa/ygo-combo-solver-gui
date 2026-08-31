@@ -1,4 +1,4 @@
-import type { CommonRunOptions, RunSpec } from '../../shared/types';
+import type { CardRef, CommonRunOptions, RunSpec, TargetSpec } from '../../shared/types';
 
 /**
  * Single source of truth mapping RunSpecs to solver argv (TDD §6).
@@ -57,6 +57,16 @@ function commonFlags(common: CommonRunOptions): string[] {
   return argv;
 }
 
+/** Cards in a hand-style list flag are pipe-joined passcodes: "1|2|3". */
+function pipeJoin(cards: CardRef[]): string {
+  return cards.map((c) => String(c.passcode)).join('|');
+}
+
+/** --target grammar: code@zone with :fd for face-down (zone always explicit). */
+function targetArg(target: TargetSpec): string {
+  return `${target.card.passcode}@${target.zone}${target.facedown ? ':fd' : ''}`;
+}
+
 export function buildArgv(spec: RunSpec): string[] {
   // Deterministic order: positional replay, workflow flags, common flags, extra args.
   const argv: string[] = [spec.replay];
@@ -65,6 +75,23 @@ export function buildArgv(spec: RunSpec): string[] {
       break; // verify is the bare invocation: replay + no --solve
     case 'optimize':
       argv.push('--solve', '--optimize');
+      break;
+    case 'deckhand':
+      // --deck implies --solve.
+      argv.push('--deck', spec.deck);
+      if (spec.hand.length > 0) argv.push('--hand', pipeJoin(spec.hand));
+      break;
+    case 'board':
+      argv.push('--no-ref', '--deck', spec.deck);
+      if (spec.hand.length > 0) argv.push('--hand', pipeJoin(spec.hand));
+      for (const target of spec.targets) argv.push('--target', targetArg(target));
+      break;
+    case 'fire':
+      // --fire implies --solve; repeats count for repeated targets.
+      for (const card of spec.fire) argv.push('--fire', String(card.passcode));
+      for (const card of spec.fireSpare) argv.push('--fire-spare', String(card.passcode));
+      if (spec.oppHand.length > 0) argv.push('--opp-hand', pipeJoin(spec.oppHand));
+      for (const guard of spec.guards) argv.push('--guard', guard);
       break;
   }
   argv.push(...commonFlags(spec.common));
