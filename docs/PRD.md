@@ -49,7 +49,7 @@ Facts about the solver that constrain the GUI design (from a survey of the repo 
 - **No cancellation hook**: the solver has no graceful-stop mechanism. Killing the process loses all results, because solutions are written only at the end of a phase.
 - **Health gate**: a replay only reproduces under the card scripts contemporary with its recording. Under a mismatched script set the run silently continues on a *different duel*. The tell is the report line `MSG_RETRY: 0` (healthy) vs non-zero (broken). The solver also marks ineffective flags `!! INERT`.
 - **Exit codes**: `0` ok, `2` usage error, `1` load or health failure.
-- **Platforms**: the shipped binary is Windows x64 only. One file (`arena.cpp`, the snapshot allocator) hard-depends on Windows memory APIs (`VirtualAlloc`, `GetWriteWatch`). However, a complete **WebAssembly port exists** (local `web` branch, commit `c9b9821`): all 57 translation units compile under clang/emscripten, run at 0.88× native throughput, and the port's **Node target (`NODERAWFS`) runs on macOS today** with the identical CLI, reading a real EDOPro install from disk.
+- **Platforms**: the shipped binary is Windows x64 only. One file (`arena.cpp`, the snapshot allocator) hard-depends on Windows memory APIs (`VirtualAlloc`, `GetWriteWatch`). However, a complete **WebAssembly port exists** (commit `c9b9821`, in origin/master's pushed history; a later commit removed the files from master's tree, and the `web` branch its message references was never actually created): all 57 translation units compile under clang/emscripten, run at 0.88× native throughput, and the port's **Node target (`NODERAWFS`) runs on macOS today** with the identical CLI, reading a real EDOPro install from disk.
 - **License**: AGPL-3.0-or-later (statically links ocgcore).
 
 ## 5. Product scope
@@ -182,14 +182,14 @@ The run manager owns the subprocess lifecycle, arg serialization (form → flags
 ### 7.4 Solver delivery
 
 - **Windows**: bundle the released `combosolver.exe` with the GUI installer (with its `LICENSE`/`NOTICE`), settings override for custom builds.
-- **macOS**: bundle the wasm build (`combosolver.wasm` + JS glue) and run it on Electron's Node. Requires building the wasm target from the solver's `web` branch (see risk in §9 — that branch is currently local-only) and rebasing it onto current master (it is ~8 commits behind and predates the French→English constraint-spelling rename).
+- **macOS**: bundle the wasm build (`combosolver.wasm` + JS glue) and run it on Electron's Node. Requires building the wasm target from solver commit `c9b9821` (safely in origin/master's pushed history), forward-ported onto current master (it is ~8 commits behind and predates the French→English constraint-spelling rename).
 - **Long term**: a native macOS solver build (portable `arena.cpp` backend using `mmap`/`mprotect` plus the software write barrier the wasm arm already uses) removes the wasm dependency and the 4 GiB wasm memory ceiling. Tracked as an upstream ask, not a GUI blocker.
 
 ## 8. Upstream asks (solver repo)
 
 The GUI works against the solver as-is (subprocess + text scraping). These small upstream changes would remove the two worst seams, in priority order:
 
-1. **Push the `web` branch** (commit `c9b9821`) to origin. It exists only in one local clone's object store and is the linchpin of the macOS story.
+1. **Recreate and push a `web` branch at commit `c9b9821`** so the wasm port is discoverable and the GUI's solver lockfile has a stable named ref. (Correction 2026-08-31: the commit is an ancestor of origin/master, so the code is already safe in pushed history; the branch its removal commit references was never created. Nice-to-have, not a rescue.)
 2. **Graceful stop**: a mechanism (signal handler or stop file) that ends the current phase early and writes best-so-far solutions before exiting. Today, cancelling loses everything.
 3. **Machine-readable events**: a `--json` (or similar) flag emitting structured progress/result events alongside or instead of the text report. Removes the GUI's dependency on parsing human-facing text that the solver repo actively rewords.
 4. Later: a `libcombosolver` static-library target with progress/cancel callbacks, enabling in-process integration.
@@ -200,7 +200,6 @@ None of these block MVP; #2 and #3 gate how good monitoring/cancellation can be.
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| `web` branch lost (local-only, unpushed) | macOS story collapses to "port arena.cpp first" | Push it now (§8.1); archive a bundle meanwhile |
 | Stdout format drift (repo rewords output; some strings still French) | Parsed status/summary breaks silently | Best-effort parsing, raw log always authoritative (§5.2.4); integration tests pinned to a solver version; upstream `--json` |
 | Script/replay version mismatch confuses users | "Wrong duel, no error" — solver's #1 documented hazard | Verify-first nudge, MSG_RETRY banner, per-run `--scriptdir` override (§5.2.1, §5.2.4) |
 | wasm build behind master (old flag spellings, 8 commits) | Mac and Windows behavior diverge | Rebase wasm build onto master before bundling; CI check that both artifacts come from the same solver commit |
