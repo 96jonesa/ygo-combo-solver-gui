@@ -5,7 +5,8 @@ import { ResultsPanel } from './results-panel';
 import { TargetEditor } from './target-editor';
 import { useAppStore } from '../store';
 
-type WorkflowKind = RunSpec['kind'];
+// The remaining workflows (deckhand/board/fire) get forms in the M2 UI PR.
+type WorkflowKind = 'verify' | 'optimize';
 
 const WORKFLOWS: { kind: WorkflowKind; label: string; hint: string }[] = [
   {
@@ -67,7 +68,8 @@ export function RunView() {
   // Consume a spec loaded from history ("duplicate run" / "use as input").
   useEffect(() => {
     if (draft === null) return;
-    setKind(draft.kind);
+    // Only M1 kinds can exist as drafts until the M2 forms land.
+    if (draft.kind === 'verify' || draft.kind === 'optimize') setKind(draft.kind);
     setReplay(draft.replay);
     setDeck(draft.kind === 'deckhand' || draft.kind === 'board' ? draft.deck : '');
     setHand(draft.kind === 'deckhand' || draft.kind === 'board' ? draft.hand : []);
