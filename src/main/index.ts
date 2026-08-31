@@ -5,15 +5,50 @@ import path from 'node:path';
 import { IpcChannels } from '../shared/ipc';
 import type { FilePickerKind, ResultOpenRequest } from '../shared/ipc';
 import type { RunSpec, Settings } from '../shared/types';
+import { CardIndex } from './edopro/carddb';
 import { openReplayInEdopro } from './edopro/launcher';
 import { candidateWorkdirs, probeWorkdir } from './edopro/probe';
 import { NativeRunner } from './solver/native-runner';
 import { RunManager } from './solver/run-manager';
+import { validateSpec } from './solver/validate';
 import { HistoryStore } from './store/history';
 import { SettingsStore } from './store/settings';
+import type { CardIndexStatus } from '../shared/types';
 
 const settingsStore = new SettingsStore(app.getPath('userData'));
 const historyStore = new HistoryStore(path.join(app.getPath('userData'), 'runs'));
+
+/** Card index lifecycle: (re)built on startup and on workdir changes. */
+let cardIndex = CardIndex.empty();
+let cardIndexState: CardIndexStatus['state'] = 'empty';
+let cardIndexError: string | undefined;
+let indexedWorkdir: string | null = null;
+
+function reloadCardIndex(): void {
+  const workdir = settingsStore.get().workdir;
+  if (workdir === indexedWorkdir && cardIndexState !== 'error') return;
+  indexedWorkdir = workdir;
+  if (workdir === null) {
+    cardIndex = CardIndex.empty();
+    cardIndexState = 'empty';
+    return;
+  }
+  cardIndexState = 'loading';
+  cardIndexError = undefined;
+  CardIndex.load(workdir)
+    .then((index) => {
+      // A workdir change while loading wins; drop the stale result.
+      if (indexedWorkdir !== workdir) return;
+      cardIndex = index;
+      cardIndexState = 'ready';
+    })
+    .catch((error: Error) => {
+      if (indexedWorkdir !== workdir) return;
+      cardIndex = CardIndex.empty();
+      cardIndexState = 'error';
+      cardIndexError = error.message;
+    });
+}
 
 function bundledSolverPath(): string {
   // Packaged builds carry the solver under resources/ (TDD §12); in dev
@@ -62,10 +97,29 @@ function registerIpc(window: BrowserWindow): void {
   const runManager = createRunManager(window);
 
   ipcMain.handle(IpcChannels.settingsGet, () => settingsStore.get());
-  ipcMain.handle(IpcChannels.settingsSet, (_e, settings: Settings) => settingsStore.set(settings));
+  ipcMain.handle(IpcChannels.settingsSet, (_e, settings: Settings) => {
+    const saved = settingsStore.set(settings);
+    reloadCardIndex();
+    return saved;
+  });
   ipcMain.handle(IpcChannels.workdirProbe, (_e, dir: string) => probeWorkdir(dir));
+  ipcMain.handle(IpcChannels.cardsSearch, (_e, query: string) => cardIndex.search(query));
+  ipcMain.handle(
+    IpcChannels.cardsStatus,
+    (): CardIndexStatus => ({
+      state: cardIndexState,
+      cards: cardIndex.cards,
+      databases: cardIndex.databases,
+      error: cardIndexError,
+    }),
+  );
   ipcMain.handle(IpcChannels.runPreview, (_e, spec: RunSpec) => runManager.preview(spec));
-  ipcMain.handle(IpcChannels.runStart, (_e, spec: RunSpec) => runManager.start(spec));
+  ipcMain.handle(IpcChannels.runStart, (_e, spec: RunSpec) => {
+    // Structured pre-launch validation instead of a spawn that exits 2.
+    const problems = validateSpec(spec);
+    if (problems.length > 0) throw new Error(problems.join('; '));
+    return runManager.start(spec);
+  });
   ipcMain.handle(IpcChannels.runStop, (_e, runId: string) => runManager.stop(runId));
   ipcMain.handle(IpcChannels.historyList, () => historyStore.list());
   ipcMain.handle(IpcChannels.historyGet, (_e, runId: string) => historyStore.get(runId));
@@ -154,6 +208,7 @@ function applyContentSecurityPolicy(): void {
 void app.whenReady().then(() => {
   applyContentSecurityPolicy();
   autodetectWorkdir();
+  reloadCardIndex();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

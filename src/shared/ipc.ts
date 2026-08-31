@@ -1,4 +1,6 @@
 import type {
+  CardHit,
+  CardIndexStatus,
   RunEvent,
   RunPreview,
   RunRecord,
@@ -13,6 +15,8 @@ export const IpcChannels = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
   workdirProbe: 'workdir:probe',
+  cardsSearch: 'cards:search',
+  cardsStatus: 'cards:status',
   runPreview: 'run:preview',
   runStart: 'run:start',
   runStop: 'run:stop',
@@ -40,6 +44,8 @@ export interface RendererApi {
   getSettings(): Promise<Settings>;
   setSettings(settings: Settings): Promise<Settings>;
   probeWorkdir(path: string): Promise<WorkdirHealth>;
+  searchCards(query: string): Promise<CardHit[]>;
+  cardStatus(): Promise<CardIndexStatus>;
   previewRun(spec: RunSpec): Promise<RunPreview>;
   startRun(spec: RunSpec): Promise<StartResult>;
   stopRun(runId: string): Promise<void>;
