@@ -87,6 +87,10 @@ export class SolverOutputParser {
       this.status.ladder = { discrepancies: Number(match[1]), solutions: Number(match[2]) };
     }
 
+    if ((match = trimmed.match(/^=== --fire verdict: (\d+) window\(s\) out of (\d+) converted/))) {
+      this.status.fireVerdict = { converted: Number(match[1]), windows: Number(match[2]) };
+    }
+
     if ((match = trimmed.match(/^(\d+) replay\(s\) written to \S+(?:\s+\(out of (\d+) candidate\(s\)\))?/))) {
       this.status.solutionsWritten = {
         written: Number(match[1]),
