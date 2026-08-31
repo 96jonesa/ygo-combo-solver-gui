@@ -1,4 +1,4 @@
-import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, session, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -93,7 +93,7 @@ function createWindow(): void {
     width: 1150,
     height: 780,
     webPreferences: {
-      preload: path.join(import.meta.dirname, '../preload/index.mjs'),
+      preload: path.join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -115,7 +115,23 @@ function createWindow(): void {
   }
 }
 
+function applyContentSecurityPolicy(): void {
+  // Applied only to packaged builds: the dev server needs the inline
+  // react-refresh preamble that script-src 'self' would block, while a
+  // production bundle contains no inline scripts at all.
+  if (!app.isPackaged) return;
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': ["default-src 'self'; style-src 'self' 'unsafe-inline'"],
+      },
+    });
+  });
+}
+
 void app.whenReady().then(() => {
+  applyContentSecurityPolicy();
   autodetectWorkdir();
   createWindow();
   app.on('activate', () => {
