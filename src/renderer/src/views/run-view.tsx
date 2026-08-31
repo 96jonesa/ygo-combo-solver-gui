@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { RunSpec } from '../../../shared/types';
+import type { CardIndexStatus, CardRef, RunSpec, TargetSpec } from '../../../shared/types';
+import { CardChips, CardPicker } from './card-picker';
 import { ResultsPanel } from './results-panel';
+import { TargetEditor } from './target-editor';
 import { useAppStore } from '../store';
 
-// The remaining workflows (deckhand/board/fire) get forms in the M2 UI PR.
-type WorkflowKind = 'verify' | 'optimize';
+type WorkflowKind = RunSpec['kind'];
 
 const WORKFLOWS: { kind: WorkflowKind; label: string; hint: string }[] = [
   {
@@ -17,6 +18,21 @@ const WORKFLOWS: { kind: WorkflowKind; label: string; hint: string }[] = [
     label: 'Find a cheaper line',
     hint: 'Searches for lines reaching the same end board while burning fewer cards (--solve --optimize). Verify the replay first if you have not already.',
   },
+  {
+    kind: 'deckhand',
+    label: 'Solve from another deck/hand',
+    hint: 'Reaches the reference replay’s end board from a different decklist (.ydk), optionally forcing the opening hand. Copies count — add a card twice to require two.',
+  },
+  {
+    kind: 'board',
+    label: 'Build a described board',
+    hint: 'No reference line: describe the board card by card and the solver searches for any way to build it from the decklist (--no-ref --target). The replay supplies only the duel setup (template).',
+  },
+  {
+    kind: 'fire',
+    label: 'Test against interruption',
+    hint: 'Proves the replay’s line converts when the opponent resolves a card against it (--fire). Optional: cards the line may sacrifice (--fire-spare), a known opponent hand (--opp-hand), and raw --guard clauses (one per line, advanced grammar).',
+  },
 ];
 
 export function RunView() {
@@ -28,6 +44,13 @@ export function RunView() {
 
   const [kind, setKind] = useState<WorkflowKind>('verify');
   const [replay, setReplay] = useState('');
+  const [deck, setDeck] = useState('');
+  const [hand, setHand] = useState<CardRef[]>([]);
+  const [targets, setTargets] = useState<TargetSpec[]>([]);
+  const [fire, setFire] = useState<CardRef[]>([]);
+  const [fireSpare, setFireSpare] = useState<CardRef[]>([]);
+  const [oppHand, setOppHand] = useState<CardRef[]>([]);
+  const [guards, setGuards] = useState('');
   const [solveMs, setSolveMs] = useState(settings.defaults.solveMs);
   const [threads, setThreads] = useState<string>(settings.defaults.threads?.toString() ?? '');
   const [seed, setSeed] = useState('');
@@ -35,13 +58,24 @@ export function RunView() {
   const [preview, setPreview] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
+  const [cardStatus, setCardStatus] = useState<CardIndexStatus | null>(null);
+
+  useEffect(() => {
+    void window.api.cardStatus().then(setCardStatus);
+  }, []);
 
   // Consume a spec loaded from history ("duplicate run" / "use as input").
   useEffect(() => {
     if (draft === null) return;
-    // Only M1 kinds can exist as drafts until the M2 forms land.
-    if (draft.kind === 'verify' || draft.kind === 'optimize') setKind(draft.kind);
+    setKind(draft.kind);
     setReplay(draft.replay);
+    setDeck(draft.kind === 'deckhand' || draft.kind === 'board' ? draft.deck : '');
+    setHand(draft.kind === 'deckhand' || draft.kind === 'board' ? draft.hand : []);
+    setTargets(draft.kind === 'board' ? draft.targets : []);
+    setFire(draft.kind === 'fire' ? draft.fire : []);
+    setFireSpare(draft.kind === 'fire' ? draft.fireSpare : []);
+    setOppHand(draft.kind === 'fire' ? draft.oppHand : []);
+    setGuards(draft.kind === 'fire' ? draft.guards.join('\n') : '');
     if (draft.common.solveMs !== undefined) setSolveMs(draft.common.solveMs);
     setThreads(draft.common.threads?.toString() ?? '');
     setSeed(draft.common.seed?.toString() ?? '');
@@ -49,19 +83,36 @@ export function RunView() {
     setDraft(null);
   }, [draft, setDraft]);
 
-  const spec = useMemo<RunSpec>(
-    () => ({
-      kind,
-      replay,
-      common: {
-        solveMs,
-        ...(threads !== '' && { threads: Number(threads) }),
-        ...(seed !== '' && { seed: Number(seed) }),
-        ...(extraArgs.trim() !== '' && { extraArgs }),
-      },
-    }),
-    [kind, replay, solveMs, threads, seed, extraArgs],
-  );
+  const spec = useMemo<RunSpec>(() => {
+    const common = {
+      solveMs,
+      ...(threads !== '' && { threads: Number(threads) }),
+      ...(seed !== '' && { seed: Number(seed) }),
+      ...(extraArgs.trim() !== '' && { extraArgs }),
+    };
+    switch (kind) {
+      case 'verify':
+      case 'optimize':
+        return { kind, replay, common };
+      case 'deckhand':
+        return { kind, replay, deck, hand, common };
+      case 'board':
+        return { kind, replay, deck, hand, targets, common };
+      case 'fire':
+        return {
+          kind,
+          replay,
+          fire,
+          fireSpare,
+          oppHand,
+          guards: guards
+            .split('\n')
+            .map((g) => g.trim())
+            .filter((g) => g !== ''),
+          common,
+        };
+    }
+  }, [kind, replay, deck, hand, targets, fire, fireSpare, oppHand, guards, solveMs, threads, seed, extraArgs]);
 
   // Debounced command preview from the same serializer that spawns.
   useEffect(() => {
@@ -79,6 +130,12 @@ export function RunView() {
 
   const running = run?.status === 'running';
   const workflow = WORKFLOWS.find((w) => w.kind === kind)!;
+  const needsDeck = kind === 'deckhand' || kind === 'board';
+  const cardsReady = cardStatus?.state === 'ready' && cardStatus.cards > 0;
+
+  const pickFile = (kindOfFile: 'replay' | 'ydk', set: (path: string) => void) => {
+    void window.api.pickFile(kindOfFile).then((f) => f !== null && set(f));
+  };
 
   const onStart = async () => {
     setError(null);
@@ -121,17 +178,103 @@ export function RunView() {
           </select>
         </div>
         <p className="hint">{workflow.hint}</p>
+
         <div className="row">
-          <label>Replay</label>
+          <label>{kind === 'board' ? 'Template replay' : 'Replay'}</label>
           <input value={replay} readOnly placeholder="pick a .yrpX / .yrp file" />
-          <button
-            onClick={() => {
-              void window.api.pickFile('replay').then((f) => f !== null && setReplay(f));
-            }}
-          >
-            Browse…
-          </button>
+          <button onClick={() => pickFile('replay', setReplay)}>Browse…</button>
         </div>
+
+        {needsDeck && (
+          <>
+            <div className="row">
+              <label>Decklist</label>
+              <input value={deck} readOnly placeholder="pick a .ydk file" />
+              <button onClick={() => pickFile('ydk', setDeck)}>Browse…</button>
+            </div>
+            <div className="row picker-row">
+              <label>Opening hand</label>
+              <div className="picker-stack">
+                <CardChips cards={hand} onRemove={(i) => setHand(hand.filter((_, j) => j !== i))} />
+                <CardPicker
+                  disabled={!cardsReady}
+                  placeholder="optional: force the opening hand…"
+                  onPick={(card) => setHand([...hand, card])}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {kind === 'board' && (
+          <div className="row picker-row">
+            <label>Target board</label>
+            <div className="picker-stack">
+              <TargetEditor targets={targets} onChange={setTargets} disabled={!cardsReady} />
+            </div>
+          </div>
+        )}
+
+        {kind === 'fire' && (
+          <>
+            <div className="row picker-row">
+              <label>Fire against</label>
+              <div className="picker-stack">
+                <CardChips cards={fire} onRemove={(i) => setFire(fire.filter((_, j) => j !== i))} />
+                <CardPicker
+                  disabled={!cardsReady}
+                  placeholder="card(s) the opponent resolves…"
+                  onPick={(card) => setFire([...fire, card])}
+                />
+              </div>
+            </div>
+            <div className="row picker-row">
+              <label>May sacrifice</label>
+              <div className="picker-stack">
+                <CardChips
+                  cards={fireSpare}
+                  onRemove={(i) => setFireSpare(fireSpare.filter((_, j) => j !== i))}
+                />
+                <CardPicker
+                  disabled={!cardsReady}
+                  placeholder="optional: board cards the line may give up…"
+                  onPick={(card) => setFireSpare([...fireSpare, card])}
+                />
+              </div>
+            </div>
+            <div className="row picker-row">
+              <label>Opponent hand</label>
+              <div className="picker-stack">
+                <CardChips
+                  cards={oppHand}
+                  onRemove={(i) => setOppHand(oppHand.filter((_, j) => j !== i))}
+                />
+                <CardPicker
+                  disabled={!cardsReady}
+                  placeholder="optional: known opponent hand…"
+                  onPick={(card) => setOppHand([...oppHand, card])}
+                />
+              </div>
+            </div>
+            <div className="row">
+              <label>Guards</label>
+              <textarea
+                value={guards}
+                rows={2}
+                onChange={(e) => setGuards(e.target.value)}
+                placeholder={'optional, one --guard clause per line, e.g.\n5:Crystal Wing|Zalen@field+Junk Signal@hand'}
+              />
+            </div>
+          </>
+        )}
+
+        {needsDeck && !cardsReady && (
+          <p className="hint">
+            Card search is unavailable ({cardStatus?.state ?? 'unknown'}) — set a valid EDOPro
+            directory in Settings to enable the pickers. File-based fields still work.
+          </p>
+        )}
+
         <div className="row">
           <label>Budget</label>
           <select value={solveMs} onChange={(e) => setSolveMs(Number(e.target.value))}>
@@ -254,6 +397,14 @@ function HealthBanner() {
     banners.push(
       <div key="checks" className="banner banner-bad">
         ✗ solver self-checks failed{parsed.selfChecks.detail && ` — ${parsed.selfChecks.detail}`}
+      </div>,
+    );
+  }
+  if (parsed.fireVerdict !== undefined) {
+    const { converted, windows } = parsed.fireVerdict;
+    banners.push(
+      <div key="fire" className={`banner ${converted === windows ? 'banner-ok' : 'banner-warn'}`}>
+        fire verdict: {converted}/{windows} interruption window(s) converted
       </div>,
     );
   }

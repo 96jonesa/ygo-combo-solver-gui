@@ -8,7 +8,7 @@ Targets **macOS** and **Windows**.
 
 ## Status
 
-**In development — M1 (core loop).** M0 (Electron skeleton: settings, EDOPro detection, solver spawning, live log streaming) is merged; M1 adds the verify/cheaper-line workflows, health banners, results, and run history. Design docs:
+**In development — M2 (full MVP forms).** Merged so far: M0 (Electron skeleton: settings, EDOPro detection, solver spawning, live log streaming) and M1 (verify + cheaper-line workflows, health banners, live status, ranked results, run history). M2 adds the card picker over EDOPro's card databases and the remaining workflows: solve from another deck/hand, build a described board, and test against interruption. Design docs:
 
 | Document | Contents |
 | --- | --- |

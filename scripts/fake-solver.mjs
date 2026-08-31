@@ -65,6 +65,14 @@ while (Date.now() - start < runtimeMs) {
   );
   rung += 1;
 }
+if (argv.includes('--fire')) {
+  console.log('');
+  console.log('--- injection windows ---');
+  console.log('  window 1: converted (full board)');
+  console.log('  window 2: converted (without the sacrificed card)');
+  console.log('  window 3: failed');
+  console.log('=== --fire verdict: 2 window(s) out of 3 converted (1 full board, 1 without the sacrificed card) ===');
+}
 console.log('');
 console.log('--- output ---');
 // Write fake artifacts so the results panel has something to list.

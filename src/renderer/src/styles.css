@@ -237,6 +237,140 @@ button.danger {
   opacity: 0.85;
 }
 
+.picker-row {
+  align-items: flex-start;
+}
+
+.picker-row label {
+  padding-top: 0.4rem;
+}
+
+.picker-stack {
+  flex: 0 1 28rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.card-picker {
+  position: relative;
+}
+
+.card-picker input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+}
+
+.card-hits {
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  margin: 0.15rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  max-height: 16rem;
+  overflow-y: auto;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  background: Canvas;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.card-hits-empty {
+  padding: 0.5rem 0.75rem;
+  opacity: 0.6;
+}
+
+.card-hits button {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.card-hits button:hover {
+  background: color-mix(in srgb, #4a7dff 15%, transparent);
+}
+
+.hit-meta {
+  opacity: 0.55;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.3rem 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  font-size: 0.85rem;
+}
+
+.chip-x {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  opacity: 0.6;
+  padding: 0 0.25rem;
+}
+
+.chip-x:hover {
+  opacity: 1;
+}
+
+.target-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.target-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.target-name {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.fd {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.fd-na {
+  opacity: 0.4;
+}
+
+.row textarea {
+  flex: 0 1 28rem;
+  padding: 0.35rem 0.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
 .live-status {
   font-size: 0.85rem;
   opacity: 0.75;

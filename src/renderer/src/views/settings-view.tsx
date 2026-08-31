@@ -1,5 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import type { CardIndexStatus } from '../../../shared/types';
 import { useAppStore } from '../store';
+
+/** Card-index status inside the probe panel; polls briefly while loading. */
+function CardIndexLine() {
+  const [status, setStatus] = useState<CardIndexStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      for (let i = 0; i < 20 && !cancelled; i++) {
+        const current = await window.api.cardStatus();
+        if (cancelled) return;
+        setStatus(current);
+        if (current.state !== 'loading') return;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (status === null) return null;
+  const text =
+    status.state === 'ready'
+      ? `card index: ${status.cards.toLocaleString()} cards from ${status.databases} database(s)`
+      : status.state === 'loading'
+        ? 'card index: loading…'
+        : status.state === 'error'
+          ? `card index failed: ${status.error ?? 'unknown error'}`
+          : 'card index: empty';
+  return <div>{text}</div>;
+}
 
 export function SettingsView() {
   const settings = useAppStore((s) => s.settings)!;
@@ -54,6 +88,7 @@ export function SettingsView() {
                 • {p}
               </div>
             ))}
+            <CardIndexLine />
           </div>
         )}
       </section>
