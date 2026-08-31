@@ -8,7 +8,7 @@ Targets **macOS** and **Windows**.
 
 ## Status
 
-**Design phase — no code yet.** The product and technical designs are settled:
+**In development — M1 (core loop).** M0 (Electron skeleton: settings, EDOPro detection, solver spawning, live log streaming) is merged; M1 adds the verify/cheaper-line workflows, health banners, results, and run history. Design docs:
 
 | Document | Contents |
 | --- | --- |
@@ -16,6 +16,18 @@ Targets **macOS** and **Windows**.
 | [TDD](docs/TDD.md) | Electron architecture, solver-runner abstraction, argv serialization, stdout parser contract, storage, packaging, testing |
 
 Work is tracked in [Linear](https://linear.app/ygo-combo-solver-gui).
+
+## Development
+
+```sh
+npm install
+npm run dev        # launch the app with hot reload
+npm test           # unit + integration tests (vitest)
+npm run typecheck  # strict tsc
+npm run build      # production bundles into out/
+```
+
+No solver binary ships with the repo yet. To exercise the full run loop on any machine, point **Settings → Solver path** at `scripts/fake-solver.mjs` — a stand-in that emits solver-shaped output, honors `--solve-ms`, and writes fake solution files. The real `combosolver.exe` works today on Windows via the same setting; macOS solving arrives with the M3 wasm build.
 
 ## What the MVP will do
 

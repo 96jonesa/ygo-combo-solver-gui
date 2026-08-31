@@ -1,11 +1,26 @@
 import { createWriteStream, mkdirSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
-import type { RunEvent, RunSpec, RunStatus, StartResult } from '../../shared/types';
+import type {
+  RunArtifact,
+  RunEvent,
+  RunRecord,
+  RunSpec,
+  RunStatus,
+  StartResult,
+} from '../../shared/types';
 import { buildArgv, displayCommand } from './argv';
+import { SolverOutputParser } from './parser';
+import { scanOutdir } from './results';
 import type { RunHandle, SolverRunner } from './runner';
 
 const LOG_FLUSH_MS = 50;
+
+/** The slice of HistoryStore the run manager needs (kept narrow for tests). */
+export interface RunRecorder {
+  write(record: RunRecord): void;
+  patch(runId: string, changes: Partial<RunRecord>): RunRecord | null;
+}
 
 export interface RunManagerDeps {
   /** Called at preview/start time so settings changes (solver path) apply per run. */
@@ -15,12 +30,18 @@ export interface RunManagerDeps {
   /** Fills spec.common.workdir etc. from settings before serialization. */
   resolveSpec: (spec: RunSpec) => RunSpec;
   emit: (event: RunEvent) => void;
+  history: RunRecorder;
+  /** Injectable for tests; defaults to the real outdir scanner. */
+  scanResults?: (outdir: string) => RunArtifact[];
 }
 
 interface ActiveRun {
   runId: string;
   handle: RunHandle;
   status: RunStatus;
+  outdir: string;
+  parser: SolverOutputParser;
+  parserChanged: boolean;
   pendingLines: string[];
   flushTimer: NodeJS.Timeout | null;
   logStream: ReturnType<typeof createWriteStream>;
@@ -29,7 +50,9 @@ interface ActiveRun {
 
 /**
  * Owns the solver subprocess lifecycle (TDD §4): one run at a time,
- * line batching to the renderer every 50 ms, full log on disk.
+ * line batching to the renderer every 50 ms, full log on disk, parsed
+ * status piggybacked on log batches, and a history record written at
+ * start and completed at exit.
  */
 export class RunManager {
   private active: ActiveRun | null = null;
@@ -65,6 +88,9 @@ export class RunManager {
       runId,
       handle: runner.start(argv, { cwd: runDir }),
       status: 'running',
+      outdir: resolved.common.outdir,
+      parser: new SolverOutputParser(),
+      parserChanged: false,
       pendingLines: [],
       flushTimer: null,
       logStream: createWriteStream(logPath),
@@ -75,14 +101,27 @@ export class RunManager {
     run.logStream.on('error', (error) => console.error('log write failed:', error.message));
     run.logStream.write(`$ ${display}\n`);
 
+    this.deps.history.write({
+      version: 1,
+      runId,
+      spec: resolved,
+      argv,
+      display,
+      solver: runner.describe(),
+      startedAt: new Date().toISOString(),
+      logPath,
+      outdir: run.outdir,
+    });
+
     run.handle.onLine((_stream, line) => {
       run.logStream.write(line + '\n');
       run.pendingLines.push(line);
+      if (run.parser.feed(line)) run.parserChanged = true;
       run.flushTimer ??= setTimeout(() => this.flushLines(run), LOG_FLUSH_MS);
     });
     run.handle.onExit((code) => this.onExit(run, code));
 
-    return { runId, argv, display, logPath, outdir: resolved.common.outdir };
+    return { runId, argv, display, logPath, outdir: run.outdir };
   }
 
   stop(runId: string): void {
@@ -97,10 +136,17 @@ export class RunManager {
       clearTimeout(run.flushTimer);
       run.flushTimer = null;
     }
-    if (run.pendingLines.length === 0) return;
-    const logBatch = run.pendingLines;
-    run.pendingLines = [];
-    this.deps.emit({ runId: run.runId, logBatch });
+    if (run.pendingLines.length === 0 && !run.parserChanged) return;
+    const event: RunEvent = { runId: run.runId };
+    if (run.pendingLines.length > 0) {
+      event.logBatch = run.pendingLines;
+      run.pendingLines = [];
+    }
+    if (run.parserChanged) {
+      event.parsed = run.parser.snapshot();
+      run.parserChanged = false;
+    }
+    this.deps.emit(event);
   }
 
   private onExit(run: ActiveRun, code: number | null): void {
@@ -120,9 +166,20 @@ export class RunManager {
             ? 'load or health failure (exit 1) — see the log'
             : `solver terminated unexpectedly (code ${code ?? 'none'})`;
     }
+
+    const artifacts = (this.deps.scanResults ?? scanOutdir)(run.outdir);
+    this.deps.history.patch(run.runId, {
+      endedAt: new Date().toISOString(),
+      outcome: run.status,
+      exitCode: code,
+      status: run.parser.snapshot(),
+      artifacts,
+    });
+
     this.deps.emit({
       runId: run.runId,
       statusUpdate: { status: run.status, exitCode: code, message },
+      parsed: run.parser.snapshot(),
     });
     this.active = null;
   }

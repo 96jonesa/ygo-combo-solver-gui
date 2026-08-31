@@ -1,17 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { RunSpec } from '../../../shared/types';
+import { ResultsPanel } from './results-panel';
 import { useAppStore } from '../store';
 
-/**
- * M0 run view: the verify workflow (replay + common options + extra
- * args), live log streaming, and the always-visible command preview.
- * M1 adds the remaining workflow forms and the results pane.
- */
+type WorkflowKind = RunSpec['kind'];
+
+const WORKFLOWS: { kind: WorkflowKind; label: string; hint: string }[] = [
+  {
+    kind: 'verify',
+    label: 'Verify a replay',
+    hint: 'Replays the duel and checks it reproduces under your card scripts (MSG_RETRY must be 0). Do this once for every new replay — under mismatched scripts the solver silently runs a different duel.',
+  },
+  {
+    kind: 'optimize',
+    label: 'Find a cheaper line',
+    hint: 'Searches for lines reaching the same end board while burning fewer cards (--solve --optimize). Verify the replay first if you have not already.',
+  },
+];
+
 export function RunView() {
   const settings = useAppStore((s) => s.settings)!;
   const run = useAppStore((s) => s.run);
+  const draft = useAppStore((s) => s.draft);
+  const setDraft = useAppStore((s) => s.setDraft);
   const startRun = useAppStore((s) => s.startRun);
 
+  const [kind, setKind] = useState<WorkflowKind>('verify');
   const [replay, setReplay] = useState('');
   const [solveMs, setSolveMs] = useState(settings.defaults.solveMs);
   const [threads, setThreads] = useState<string>(settings.defaults.threads?.toString() ?? '');
@@ -21,9 +35,21 @@ export function RunView() {
   const [error, setError] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState(false);
 
+  // Consume a spec loaded from history ("duplicate run" / "use as input").
+  useEffect(() => {
+    if (draft === null) return;
+    setKind(draft.kind);
+    setReplay(draft.replay);
+    if (draft.common.solveMs !== undefined) setSolveMs(draft.common.solveMs);
+    setThreads(draft.common.threads?.toString() ?? '');
+    setSeed(draft.common.seed?.toString() ?? '');
+    setExtraArgs(draft.common.extraArgs ?? '');
+    setDraft(null);
+  }, [draft, setDraft]);
+
   const spec = useMemo<RunSpec>(
     () => ({
-      kind: 'verify',
+      kind,
       replay,
       common: {
         solveMs,
@@ -32,7 +58,7 @@ export function RunView() {
         ...(extraArgs.trim() !== '' && { extraArgs }),
       },
     }),
-    [replay, solveMs, threads, seed, extraArgs],
+    [kind, replay, solveMs, threads, seed, extraArgs],
   );
 
   // Debounced command preview from the same serializer that spawns.
@@ -50,6 +76,7 @@ export function RunView() {
   }, [spec]);
 
   const running = run?.status === 'running';
+  const workflow = WORKFLOWS.find((w) => w.kind === kind)!;
 
   const onStart = async () => {
     setError(null);
@@ -60,6 +87,7 @@ export function RunView() {
         display: started.display,
         logPath: started.logPath,
         outdir: started.outdir,
+        budgetMs: solveMs,
       });
       setConfirmStop(false);
     } catch (e) {
@@ -80,12 +108,17 @@ export function RunView() {
   return (
     <div className="run-view">
       <section className="form">
-        <h2>Verify a replay</h2>
-        <p className="hint">
-          Replays the duel and checks it reproduces under your card scripts (MSG_RETRY must be 0)
-          before you spend a solve budget on it. Other workflows arrive in M1/M2 — the extra
-          arguments field reaches every solver flag meanwhile.
-        </p>
+        <div className="row">
+          <label>Workflow</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as WorkflowKind)}>
+            {WORKFLOWS.map((w) => (
+              <option key={w.kind} value={w.kind}>
+                {w.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="hint">{workflow.hint}</p>
         <div className="row">
           <label>Replay</label>
           <input value={replay} readOnly placeholder="pick a .yrpX / .yrp file" />
@@ -124,7 +157,7 @@ export function RunView() {
           <input
             value={extraArgs}
             onChange={(e) => setExtraArgs(e.target.value)}
-            placeholder='e.g. --solve --optimize --verbose (appended verbatim)'
+            placeholder="appended verbatim — reaches every solver flag"
           />
         </div>
         <div className="row preview-row">
@@ -144,7 +177,12 @@ export function RunView() {
             </button>
           )}
           {run && <StatusBadge />}
+          {run && <LiveStatus />}
         </div>
+        <HealthBanner />
+        {run !== null && run.status !== 'running' && (
+          <ResultsPanel runId={run.runId} outcome={run.status} />
+        )}
       </section>
       <LogPane />
     </div>
@@ -162,6 +200,76 @@ function StatusBadge() {
           ? 'stopped'
           : `failed${run.message !== undefined ? ` — ${run.message}` : ''}`;
   return <span className={`status status-${run.status}`}>{label}</span>;
+}
+
+const PHASE_LABELS = {
+  loading: 'loading assets',
+  replay: 'replaying reference',
+  search: 'searching',
+  output: 'writing results',
+} as const;
+
+function LiveStatus() {
+  const run = useAppStore((s) => s.run)!;
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (run.status !== 'running') return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [run.status]);
+
+  if (run.status !== 'running') return null;
+  const elapsedS = Math.floor((now - run.startedAt) / 1000);
+  const budgetS = Math.floor(run.budgetMs / 1000);
+  const parts = [`${elapsedS}s / ~${budgetS}s budget`];
+  const parsed = run.parsed;
+  if (parsed?.phase !== undefined) parts.push(PHASE_LABELS[parsed.phase]);
+  if (parsed?.ladder !== undefined)
+    parts.push(
+      `rung ${parsed.ladder.discrepancies}, ${parsed.ladder.solutions} solution(s) so far`,
+    );
+  return <span className="live-status">{parts.join(' · ')}</span>;
+}
+
+function HealthBanner() {
+  const run = useAppStore((s) => s.run);
+  const parsed = run?.parsed;
+  if (!parsed) return null;
+
+  const banners: React.ReactNode[] = [];
+  if (parsed.msgRetry !== undefined) {
+    const healthy = parsed.msgRetry === 0;
+    banners.push(
+      <div key="retry" className={`banner ${healthy ? 'banner-ok' : 'banner-bad'}`}>
+        {healthy
+          ? '✓ faithful replay — MSG_RETRY 0'
+          : `✗ MSG_RETRY ${parsed.msgRetry} — the replay does NOT reproduce under these card scripts; results would describe a different duel`}
+      </div>,
+    );
+  }
+  if (parsed.selfChecks !== undefined && !parsed.selfChecks.pass) {
+    banners.push(
+      <div key="checks" className="banner banner-bad">
+        ✗ solver self-checks failed{parsed.selfChecks.detail && ` — ${parsed.selfChecks.detail}`}
+      </div>,
+    );
+  }
+  if (parsed.inertFlags.length > 0) {
+    banners.push(
+      <div key="inert" className="banner banner-warn">
+        ⚠ ignored flags (INERT): {parsed.inertFlags.join(', ')}
+      </div>,
+    );
+  }
+  for (const error of parsed.errors) {
+    banners.push(
+      <div key={error} className="banner banner-bad">
+        !! {error}
+      </div>,
+    );
+  }
+  return banners.length > 0 ? <div className="banners">{banners}</div> : null;
 }
 
 function LogPane() {

@@ -1,18 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HistoryView } from './views/history-view';
 import { RunView } from './views/run-view';
 import { SettingsView } from './views/settings-view';
 import { useAppStore } from './store';
+import type { Tab } from './store';
 import './styles.css';
 
-type Tab = 'run' | 'settings';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'run', label: 'Run' },
+  { id: 'history', label: 'History' },
+  { id: 'settings', label: 'Settings' },
+];
 
 function App() {
-  const [tab, setTab] = useState<Tab>('run');
+  const tab = useAppStore((s) => s.tab);
+  const setTab = useAppStore((s) => s.setTab);
   const settings = useAppStore((s) => s.settings);
   const setSettings = useAppStore((s) => s.setSettings);
   const setHealth = useAppStore((s) => s.setHealth);
   const appendLines = useAppStore((s) => s.appendLines);
+  const setParsed = useAppStore((s) => s.setParsed);
   const updateStatus = useAppStore((s) => s.updateStatus);
 
   useEffect(() => {
@@ -24,6 +32,7 @@ function App() {
     });
     return window.api.onRunEvent((event) => {
       if (event.logBatch) appendLines(event.runId, event.logBatch);
+      if (event.parsed) setParsed(event.runId, event.parsed);
       if (event.statusUpdate)
         updateStatus(
           event.runId,
@@ -32,21 +41,22 @@ function App() {
           event.statusUpdate.message,
         );
     });
-  }, [setSettings, setHealth, appendLines, updateStatus]);
+  }, [setSettings, setHealth, setTab, appendLines, setParsed, updateStatus]);
 
   if (settings === null) return <div className="loading">Loading…</div>;
 
   return (
     <div className="app">
       <nav className="tabs">
-        <button className={tab === 'run' ? 'active' : ''} onClick={() => setTab('run')}>
-          Run
-        </button>
-        <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
-          Settings
-        </button>
+        {TABS.map((t) => (
+          <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
       </nav>
-      <main>{tab === 'run' ? <RunView /> : <SettingsView />}</main>
+      <main>
+        {tab === 'run' ? <RunView /> : tab === 'history' ? <HistoryView /> : <SettingsView />}
+      </main>
     </div>
   );
 }

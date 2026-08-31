@@ -63,6 +63,8 @@ export interface RunEvent {
   runId: string;
   logBatch?: string[];
   statusUpdate?: RunStatusUpdate;
+  /** Latest parser snapshot, included when a batch changed it. */
+  parsed?: ParsedStatus;
 }
 
 export interface RunPreview {

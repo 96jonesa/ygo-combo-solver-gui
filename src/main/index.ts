@@ -3,14 +3,17 @@ import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { IpcChannels } from '../shared/ipc';
-import type { FilePickerKind } from '../shared/ipc';
+import type { FilePickerKind, ResultOpenRequest } from '../shared/ipc';
 import type { RunSpec, Settings } from '../shared/types';
+import { openReplayInEdopro } from './edopro/launcher';
 import { candidateWorkdirs, probeWorkdir } from './edopro/probe';
 import { NativeRunner } from './solver/native-runner';
 import { RunManager } from './solver/run-manager';
+import { HistoryStore } from './store/history';
 import { SettingsStore } from './store/settings';
 
 const settingsStore = new SettingsStore(app.getPath('userData'));
+const historyStore = new HistoryStore(path.join(app.getPath('userData'), 'runs'));
 
 function bundledSolverPath(): string {
   // Packaged builds carry the solver under resources/ (TDD §12); in dev
@@ -45,6 +48,7 @@ function createRunManager(window: BrowserWindow): RunManager {
     emit: (event) => {
       if (!window.isDestroyed()) window.webContents.send(IpcChannels.runEvent, event);
     },
+    history: historyStore,
   });
 }
 
@@ -63,6 +67,23 @@ function registerIpc(window: BrowserWindow): void {
   ipcMain.handle(IpcChannels.runPreview, (_e, spec: RunSpec) => runManager.preview(spec));
   ipcMain.handle(IpcChannels.runStart, (_e, spec: RunSpec) => runManager.start(spec));
   ipcMain.handle(IpcChannels.runStop, (_e, runId: string) => runManager.stop(runId));
+  ipcMain.handle(IpcChannels.historyList, () => historyStore.list());
+  ipcMain.handle(IpcChannels.historyGet, (_e, runId: string) => historyStore.get(runId));
+
+  ipcMain.handle(IpcChannels.resultsOpen, (_e, request: ResultOpenRequest) => {
+    const record = historyStore.get(request.runId);
+    if (record === null) return { ok: false, error: 'run not found' };
+    const target =
+      request.file === 'log' ? record.logPath : path.join(record.outdir, request.file);
+    if (request.action === 'reveal') {
+      shell.showItemInFolder(target);
+      return { ok: true };
+    }
+    const workdir = settingsStore.get().workdir;
+    if (workdir === null)
+      return { ok: false, error: 'set the EDOPro directory in Settings first' };
+    return openReplayInEdopro(workdir, target, request.runId);
+  });
 
   ipcMain.handle(IpcChannels.dialogPickFile, async (_e, kind: FilePickerKind) => {
     const result = await dialog.showOpenDialog(window, {
