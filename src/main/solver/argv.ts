@@ -63,6 +63,9 @@ export function buildArgv(spec: RunSpec): string[] {
   switch (spec.kind) {
     case 'verify':
       break; // verify is the bare invocation: replay + no --solve
+    case 'optimize':
+      argv.push('--solve', '--optimize');
+      break;
   }
   argv.push(...commonFlags(spec.common));
   if (spec.common.extraArgs?.trim()) argv.push(...splitExtraArgs(spec.common.extraArgs));

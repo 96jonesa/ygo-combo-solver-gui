@@ -1,0 +1,10 @@
+loading
+  cards             : 13842 from 34 database(s)  (398 ms)
+  script dirs       : 12
+  --burn-limit 3 !! INERT (no --solve: nothing to limit)
+
+results
+  answers consumed    : 121 / 284
+  MSG_RETRY           : 46
+!! replay diverged: card scripts do not match the recording
+  self-checks  : FAIL, snapshot stress ok
