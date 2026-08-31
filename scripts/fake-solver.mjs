@@ -39,5 +39,17 @@ while (Date.now() - start < runtimeMs) {
 }
 console.log('');
 console.log('--- output ---');
-console.log('  1 replay(s) written to solutions  (out of 1 candidate(s))');
+// Write fake artifacts so the results panel has something to list.
+const outdirIndex = argv.indexOf('--outdir');
+if (outdirIndex >= 0 && argv[outdirIndex + 1]) {
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const outdir = argv[outdirIndex + 1];
+  mkdirSync(outdir, { recursive: true });
+  for (const name of ['solution_00_b1_a9.yrp', 'solution_01_b2_a7.yrp', 'best_approach_5of8.yrp'])
+    writeFileSync(join(outdir, name), 'fake replay bytes');
+  console.log('  2 replay(s) written to solutions  (out of 5 candidate(s))');
+} else {
+  console.log('  0 replay(s) written to solutions');
+}
 process.exit(0);

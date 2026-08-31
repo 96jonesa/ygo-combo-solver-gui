@@ -3,8 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunManager } from '../../../src/main/solver/run-manager';
+import type { RunRecorder } from '../../../src/main/solver/run-manager';
 import type { RunHandle, SolverRunner } from '../../../src/main/solver/runner';
-import type { RunEvent, RunSpec } from '../../../src/shared/types';
+import type { RunEvent, RunRecord, RunSpec } from '../../../src/shared/types';
 
 /** Scripted SolverRunner: the test drives lines and exit by hand. */
 class MockRunner implements SolverRunner {
@@ -29,9 +30,27 @@ class MockRunner implements SolverRunner {
   }
 }
 
+/** In-memory RunRecorder capturing what the manager persists. */
+class MockHistory implements RunRecorder {
+  records = new Map<string, RunRecord>();
+
+  write(record: RunRecord): void {
+    this.records.set(record.runId, record);
+  }
+
+  patch(runId: string, changes: Partial<RunRecord>): RunRecord | null {
+    const existing = this.records.get(runId);
+    if (existing === undefined) return null;
+    const updated = { ...existing, ...changes };
+    this.records.set(runId, updated);
+    return updated;
+  }
+}
+
 describe('RunManager', () => {
   let runsDir: string;
   let runner: MockRunner;
+  let history: MockHistory;
   let events: RunEvent[];
   let manager: RunManager;
 
@@ -41,12 +60,17 @@ describe('RunManager', () => {
     vi.useFakeTimers();
     runsDir = mkdtempSync(path.join(os.tmpdir(), 'runs-'));
     runner = new MockRunner();
+    history = new MockHistory();
     events = [];
     manager = new RunManager({
       makeRunner: () => runner,
       runsDir,
       resolveSpec: (s) => ({ ...s, common: { ...s.common, workdir: '/edopro' } }),
       emit: (event) => events.push(event),
+      history,
+      scanResults: () => [
+        { file: 'solution_00_b1_a9.yrp', kind: 'solution', rank: 0, burned: 1, actions: 9, alt: false },
+      ],
     });
   });
 
@@ -144,6 +168,42 @@ describe('RunManager', () => {
       manager.start(spec);
       manager.stop('other-run');
       expect(runner.killed).toBe(false);
+    });
+  });
+
+  describe('history recording', () => {
+    it('writes a record at start and completes it at exit', () => {
+      const { runId } = manager.start(spec);
+      const started = history.records.get(runId);
+      expect(started).toMatchObject({ version: 1, argv: expect.arrayContaining(['duel.yrpX']) });
+      expect(started?.outcome).toBeUndefined();
+
+      runner.exitCb(0, null);
+      const finished = history.records.get(runId);
+      expect(finished).toMatchObject({ outcome: 'finished', exitCode: 0 });
+      expect(finished?.artifacts).toHaveLength(1);
+      expect(finished?.endedAt).toBeDefined();
+    });
+  });
+
+  describe('parsed status', () => {
+    it('piggybacks on log batches only when it changes', () => {
+      const { runId } = manager.start(spec);
+      runner.lineCb('out', 'some banter');
+      vi.advanceTimersByTime(60);
+      expect(events.at(-1)?.runId).toBe(runId);
+      expect(events.at(-1)?.parsed).toBeUndefined();
+
+      runner.lineCb('out', '  MSG_RETRY           : 0   (faithful replay)');
+      vi.advanceTimersByTime(60);
+      expect(events.at(-1)?.parsed?.msgRetry).toBe(0);
+    });
+
+    it('includes the final snapshot with the exit event', () => {
+      manager.start(spec);
+      runner.lineCb('out', '  seed: 888  (--seed 888 to replay)');
+      runner.exitCb(0, null);
+      expect(events.at(-1)?.parsed?.seed).toBe(888);
     });
   });
 });

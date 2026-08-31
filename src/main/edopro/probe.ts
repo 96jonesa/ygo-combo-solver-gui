@@ -54,7 +54,7 @@ export function candidateWorkdirs(platform: NodeJS.Platform, home: string): stri
   return [path.join(home, 'ProjectIgnis'), '/Applications/ProjectIgnis'];
 }
 
-function findEdoproExe(workdir: string): string | null {
+export function findEdoproExe(workdir: string): string | null {
   for (const name of ['EDOPro.exe', 'EDOPro.app', 'EDOPro']) {
     const candidate = path.join(workdir, name);
     if (existsSync(candidate)) return candidate;

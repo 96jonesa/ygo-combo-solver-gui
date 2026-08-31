@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcChannels } from '../shared/ipc';
-import type { FilePickerKind, RendererApi } from '../shared/ipc';
+import type { FilePickerKind, RendererApi, ResultOpenRequest } from '../shared/ipc';
 import type { RunEvent, RunSpec, Settings } from '../shared/types';
 
 const api: RendererApi = {
@@ -10,6 +10,9 @@ const api: RendererApi = {
   previewRun: (spec: RunSpec) => ipcRenderer.invoke(IpcChannels.runPreview, spec),
   startRun: (spec: RunSpec) => ipcRenderer.invoke(IpcChannels.runStart, spec),
   stopRun: (runId: string) => ipcRenderer.invoke(IpcChannels.runStop, runId),
+  listHistory: () => ipcRenderer.invoke(IpcChannels.historyList),
+  getRun: (runId: string) => ipcRenderer.invoke(IpcChannels.historyGet, runId),
+  openResult: (request: ResultOpenRequest) => ipcRenderer.invoke(IpcChannels.resultsOpen, request),
   pickFile: (kind: FilePickerKind) => ipcRenderer.invoke(IpcChannels.dialogPickFile, kind),
   pickDirectory: () => ipcRenderer.invoke(IpcChannels.dialogPickDirectory),
   onRunEvent: (cb: (event: RunEvent) => void) => {
