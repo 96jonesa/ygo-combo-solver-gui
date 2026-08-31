@@ -42,10 +42,13 @@ export interface CommonRunOptions {
 }
 
 /**
- * M0 carries only the verify workflow (replay + flags, no --solve);
- * M1/M2 add the remaining kinds per TDD §6.
+ * M1 carries verify (bare invocation, the health gate) and optimize
+ * (--solve --optimize, the cheaper-line search); M2 adds the remaining
+ * kinds per TDD §6.
  */
-export type RunSpec = { kind: 'verify'; replay: string; common: CommonRunOptions };
+export type RunSpec =
+  | { kind: 'verify'; replay: string; common: CommonRunOptions }
+  | { kind: 'optimize'; replay: string; common: CommonRunOptions };
 
 export type RunStatus = 'running' | 'finished' | 'failed' | 'stopped';
 
@@ -74,4 +77,56 @@ export interface StartResult {
   display: string;
   logPath: string;
   outdir: string;
+}
+
+/** A file the solver wrote to the outdir, classified by name (TDD §10.3). */
+export type RunArtifact =
+  | { file: string; kind: 'solution'; rank: number; burned: number; actions: number; alt: boolean }
+  | { file: string; kind: 'approach'; reached: number; of: number }
+  | { file: string; kind: 'joint'; rips: number; reached: number; of: number }
+  | { file: string; kind: 'rejected'; index: number; reason: 'retry' | 'constraint' | 'board' }
+  | { file: string; kind: 'other' };
+
+/** Best-effort live status distilled from the solver's stdout (TDD §7). */
+export interface ParsedStatus {
+  /** Coarse phase from section markers; undefined until recognized. */
+  phase?: 'loading' | 'replay' | 'search' | 'output';
+  msgRetry?: number;
+  selfChecks?: { pass: boolean; detail: string };
+  seed?: number;
+  /** Last discrepancy-ladder row seen: rung and solutions so far. */
+  ladder?: { discrepancies: number; solutions: number };
+  /** Distinct flags the solver marked "!! INERT". */
+  inertFlags: string[];
+  /** Fatal "!! ..." diagnostics, for the failure explanation. */
+  errors: string[];
+  solutionsWritten?: { written: number; candidates?: number };
+}
+
+export interface RunSummary {
+  runId: string;
+  kind: RunSpec['kind'];
+  replay: string;
+  startedAt: string;
+  endedAt?: string;
+  outcome?: RunStatus;
+  solutions?: number;
+}
+
+/** The persisted per-run record, runs/<runId>/run.json (TDD §10.2). */
+export interface RunRecord {
+  version: 1;
+  runId: string;
+  spec: RunSpec;
+  argv: string[];
+  display: string;
+  solver: { kind: 'native' | 'wasm'; path: string };
+  startedAt: string;
+  endedAt?: string;
+  outcome?: RunStatus;
+  exitCode?: number | null;
+  logPath: string;
+  outdir: string;
+  status?: ParsedStatus;
+  artifacts?: RunArtifact[];
 }

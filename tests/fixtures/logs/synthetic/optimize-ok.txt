@@ -1,0 +1,48 @@
+loading
+  cards             : 13842 from 34 database(s)  (412 ms)
+  script dirs       : 12  (override)
+  ocgcore           : v10.0
+  arena             : base 0x400000000000, 256 MB reserved, dirty pages tracked
+
+results
+  answers consumed    : 284 / 284
+  MSG_RETRY           : 0   (faithful replay)
+  turns played        : 1
+  burned              : 7 at the board, peak 9 along the line (recovery margin 2 - calibrates --burn-slack)
+
+--- possible lines along THIS line ---
+  raw branching product          : 10^97.3
+  after dedup by code            : 10^71.2
+
+--- cost of the reference line ---
+  normal summons         : 1
+  special summons        : 12
+  activations            : 18
+  D_ref (tier 3)         : 284
+
+--- target board (end of turn, player 0) ---
+    captured after answer #276
+      MZONE[0]  54701958  Lunalight Liger Dancer               ATK      +2 mat
+      SZONE[5]  27204311  Duel Evolution - Assault Zone        FACEUP
+
+  self-checks  : pass, enumerator coverage ok, snapshot stress ok, width ok
+
+  seed: 888  (--seed 888 to replay)
+
+--- bounded-discrepancy search around the plan ---
+  workers        : 16,  max depth 442 decisions,  novelty active (patience 9, strict)
+
+  discrep.  solutions        states   transpos.       cuts      time
+  0                 0        184213        9921      41203      3.2 s   4/8 3 mon.
+  1                 0       1902881      210394     883021     58.4 s   8/8 5 mon.
+  2                 2       3811245      401876    1290332     94.1 s   8/8 5 mon.
+
+  2 line(s) reaching the board from this deck.
+
+  #        burned   actions   decisions     main     deck    extra
+  0             1         9          61        2       22        8
+  ref           7        31         284        0       22        9
+
+--- output ---
+  2 replay(s) written to solutions  (out of 5 candidate(s))
+  3 rejected: 0 MSG_RETRY, 2 constraint, 1 board

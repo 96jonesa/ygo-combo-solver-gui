@@ -89,6 +89,21 @@ describe('buildArgv', () => {
     ]);
   });
 
+  it('serializes optimize as --solve --optimize before common flags', () => {
+    const spec: RunSpec = {
+      kind: 'optimize',
+      replay: 'duel.yrpX',
+      common: { solveMs: 300000 },
+    };
+    expect(buildArgv(spec)).toEqual([
+      'duel.yrpX',
+      '--solve',
+      '--optimize',
+      '--solve-ms',
+      '300000',
+    ]);
+  });
+
   it('appends extra arguments verbatim, last', () => {
     const spec: RunSpec = {
       kind: 'verify',
