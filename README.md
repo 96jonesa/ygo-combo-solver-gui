@@ -27,7 +27,7 @@ npm run typecheck  # strict tsc
 npm run build      # production bundles into out/
 ```
 
-No solver binary ships with the repo yet. To exercise the full run loop on any machine, point **Settings → Solver path** at `scripts/fake-solver.mjs` — a stand-in that emits solver-shaped output, honors `--solve-ms`, and writes fake solution files. The real `combosolver.exe` works today on Windows via the same setting; macOS solving arrives with the M3 wasm build.
+Solver artifacts are not checked in; `solver.lock.json` pins the [fork](https://github.com/96jonesa/ygo-combo-solver) commit they must be built from. On macOS, `scripts/build-solver.sh` builds the pinned solver (native arm64, requires a sibling `ygo-combo-solver` clone with its dependency layout — see that repo's README) and installs it under `resources/solver/mac/`, where the app picks it up automatically. On Windows, drop a `combosolver.exe` built from the same commit under `resources/solver/win/`. Without an artifact, point **Settings → Solver path** at `scripts/fake-solver.mjs` — a stand-in that emits solver-shaped output and writes fake solution files.
 
 ## What the MVP will do
 

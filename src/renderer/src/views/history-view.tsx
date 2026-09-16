@@ -65,6 +65,8 @@ export function HistoryView() {
             {selected.status?.seed !== undefined &&
               ` · seed ${selected.status.seed} (reusable for a reproducible re-run)`}
             {selected.status?.msgRetry !== undefined && ` · MSG_RETRY ${selected.status.msgRetry}`}
+            {selected.solver.solverCommit !== undefined &&
+              ` · solver ${selected.solver.solverCommit.slice(0, 12)}`}
           </p>
           <div className="row">
             <button onClick={() => duplicate(selected)}>Duplicate run</button>

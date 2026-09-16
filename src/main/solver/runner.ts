@@ -4,7 +4,7 @@ export interface SolverRunner {
   /** Spawn a run. argv excludes the program itself. */
   start(argv: string[], opts: { cwd: string }): RunHandle;
   /** Where this runner's solver came from, for display and history. */
-  describe(): { kind: 'native' | 'wasm'; path: string };
+  describe(): { kind: 'native' | 'wasm'; path: string; solverCommit?: string };
 }
 
 export interface RunHandle {

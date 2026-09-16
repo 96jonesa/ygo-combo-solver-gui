@@ -182,7 +182,7 @@ export interface RunRecord {
   spec: RunSpec;
   argv: string[];
   display: string;
-  solver: { kind: 'native' | 'wasm'; path: string };
+  solver: { kind: 'native' | 'wasm'; path: string; solverCommit?: string };
   startedAt: string;
   endedAt?: string;
   outcome?: RunStatus;

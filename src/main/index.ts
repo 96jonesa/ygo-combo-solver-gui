@@ -5,6 +5,7 @@ import path from 'node:path';
 import { IpcChannels } from '../shared/ipc';
 import type { FilePickerKind, ResultOpenRequest } from '../shared/ipc';
 import type { RunSpec, Settings } from '../shared/types';
+import { bundledSolverRelPath, readSolverManifest } from './solver/bundled';
 import { CardIndex } from './edopro/carddb';
 import { openReplayInEdopro } from './edopro/launcher';
 import { candidateWorkdirs, probeWorkdir } from './edopro/probe';
@@ -52,11 +53,12 @@ function reloadCardIndex(): void {
 
 function bundledSolverPath(): string {
   // Packaged builds carry the solver under resources/ (TDD §12); in dev
-  // the same tree sits at the project root, and is typically absent on
-  // machines without a fetched artifact — settings.solver.nativePath
-  // (e.g. scripts/fake-solver.mjs) covers development.
+  // the same tree sits at the project root (scripts/build-solver.sh puts
+  // it there) — settings.solver.nativePath (e.g. scripts/fake-solver.mjs)
+  // covers machines without an artifact.
   const root = app.isPackaged ? process.resourcesPath : app.getAppPath();
-  return path.join(root, 'resources', 'solver', 'win', 'combosolver.exe');
+  const rel = bundledSolverRelPath(process.platform);
+  return path.join(root, ...(app.isPackaged ? rel.slice(1) : rel));
 }
 
 function solverPath(): string {
@@ -77,7 +79,10 @@ function resolveSpec(spec: RunSpec): RunSpec {
 
 function createRunManager(window: BrowserWindow): RunManager {
   return new RunManager({
-    makeRunner: () => new NativeRunner(solverPath()),
+    makeRunner: () => {
+      const exe = solverPath();
+      return new NativeRunner(exe, readSolverManifest(exe).solverCommit);
+    },
     runsDir: path.join(app.getPath('userData'), 'runs'),
     resolveSpec,
     emit: (event) => {
