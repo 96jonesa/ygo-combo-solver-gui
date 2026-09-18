@@ -15,7 +15,7 @@ Targets **macOS** and **Windows**.
 | [PRD](docs/PRD.md) | Goals, users, the five MVP workflows, feature requirements, platform strategy, risks, milestones |
 | [TDD](docs/TDD.md) | Electron architecture, solver-runner abstraction, argv serialization, stdout parser contract, storage, packaging, testing |
 
-Work is tracked in [Linear](https://linear.app/ygo-combo-solver-gui). End-user documentation lives in the [User Guide](docs/GUIDE.md).
+Work is tracked in [Linear](https://linear.app/ygo-combo-solver-gui). To get running, start with the [Installation & Setup guide](docs/INSTALL.md); the [User Guide](docs/GUIDE.md) covers everything after that.
 
 ## Development
 
