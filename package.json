@@ -1,6 +1,6 @@
 {
   "name": "ygo-combo-solver-gui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Desktop GUI for ygo-combo-solver (macOS/Windows)",
   "private": true,
   "type": "module",
