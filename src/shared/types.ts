@@ -37,6 +37,8 @@ export interface CommonRunOptions {
   solveMs?: number;
   threads?: number;
   seed?: number;
+  /** Solution write ceiling (--max-written); solver default 16. */
+  maxWritten?: number;
   /** Appended verbatim after generated flags. */
   extraArgs?: string;
 }

@@ -11,6 +11,7 @@ import type { RunEvent, RunRecord, RunSpec } from '../../../src/shared/types';
 class MockRunner implements SolverRunner {
   lineCb: (stream: 'out' | 'err', line: string) => void = () => {};
   exitCb: (code: number | null, signal: string | null) => void = () => {};
+  stopped = false;
   killed = false;
   lastArgv: string[] = [];
 
@@ -23,6 +24,9 @@ class MockRunner implements SolverRunner {
     return {
       onLine: (cb) => (this.lineCb = cb),
       onExit: (cb) => (this.exitCb = cb),
+      stop: () => {
+        this.stopped = true;
+      },
       kill: () => {
         this.killed = true;
       },
@@ -157,17 +161,52 @@ describe('RunManager', () => {
     it('maps a requested stop to stopped, not failed', () => {
       const { runId } = manager.start(spec);
       manager.stop(runId);
-      expect(runner.killed).toBe(true);
-      runner.exitCb(null, 'SIGKILL');
+      runner.exitCb(0, null);
       expect(events.at(-1)?.statusUpdate?.status).toBe('stopped');
     });
   });
 
   describe('stop', () => {
+    it('requests a graceful stop, not a kill', () => {
+      const { runId } = manager.start(spec);
+      manager.stop(runId);
+      expect(runner.stopped).toBe(true);
+      expect(runner.killed).toBe(false);
+    });
+
+    it('hard-kills a solver that ignores the stop past the grace window', () => {
+      const { runId } = manager.start(spec);
+      manager.stop(runId);
+      expect(runner.killed).toBe(false);
+      vi.advanceTimersByTime(11_000);
+      expect(runner.killed).toBe(true);
+    });
+
+    it('cancels the grace timer when the solver exits in time', () => {
+      const { runId } = manager.start(spec);
+      manager.stop(runId);
+      runner.exitCb(0, null);
+      vi.advanceTimersByTime(20_000);
+      expect(runner.killed).toBe(false);
+    });
+
     it('ignores a stop for an unknown run id', () => {
       manager.start(spec);
       manager.stop('other-run');
-      expect(runner.killed).toBe(false);
+      expect(runner.stopped).toBe(false);
+    });
+  });
+
+  describe('event lines', () => {
+    it('feeds @event lines to the parser but keeps them out of log batches', () => {
+      const { runId } = manager.start(spec);
+      runner.lineCb('out', '@event {"type":"health","msgRetry":0}');
+      runner.lineCb('out', 'visible line');
+      vi.advanceTimersByTime(60);
+      const event = events.at(-1);
+      expect(event?.runId).toBe(runId);
+      expect(event?.logBatch).toEqual(['visible line']);
+      expect(event?.parsed?.msgRetry).toBe(0);
     });
   });
 

@@ -89,6 +89,48 @@ describe('SolverOutputParser', () => {
     expect(parser.snapshot().fireVerdict).toEqual({ converted: 4, windows: 6 });
   });
 
+  describe('@event lines', () => {
+    it('applies every event type directly', () => {
+      const parser = new SolverOutputParser();
+      for (const e of [
+        '{"type":"phase","phase":"search"}',
+        '{"type":"health","msgRetry":3}',
+        '{"type":"selfChecks","pass":false,"detail":"stress 1/2/1"}',
+        '{"type":"seed","seed":42}',
+        '{"type":"ladder","discrepancies":4,"solutions":7}',
+        '{"type":"written","written":24,"candidates":185}',
+        '{"type":"fireVerdict","converted":2,"windows":3}',
+        '{"type":"inert","mode":"solve","flags":"reenter 0.50"}',
+      ])
+        expect(parser.feed('@event ' + e)).toBe(true);
+      const s = parser.snapshot();
+      expect(s.phase).toBe('search');
+      expect(s.msgRetry).toBe(3);
+      expect(s.selfChecks).toEqual({ pass: false, detail: 'stress 1/2/1' });
+      expect(s.seed).toBe(42);
+      expect(s.ladder).toEqual({ discrepancies: 4, solutions: 7 });
+      expect(s.solutionsWritten).toEqual({ written: 24, candidates: 185 });
+      expect(s.fireVerdict).toEqual({ converted: 2, windows: 3 });
+      expect(s.inertFlags).toEqual(['reenter 0.50']);
+    });
+
+    it('routes the solver\'s "REQUESTED but INERT" text line to warnings, not errors', () => {
+      // This exact phrasing used to land in the red error bucket.
+      const parser = new SolverOutputParser();
+      parser.feed('!! REQUESTED but INERT here (dependency absent in this mode): reenter 0.50');
+      const s = parser.snapshot();
+      expect(s.inertFlags).toEqual(['reenter 0.50']);
+      expect(s.errors).toEqual([]);
+    });
+
+    it('falls back to the regex path on malformed events', () => {
+      const parser = new SolverOutputParser();
+      expect(() => parser.feed('@event {broken')).not.toThrow();
+      parser.feed('  MSG_RETRY           : 0');
+      expect(parser.snapshot().msgRetry).toBe(0);
+    });
+  });
+
   it('never throws on arbitrary junk lines', () => {
     const parser = new SolverOutputParser();
     for (const junk of ['', '   ', '\t', '💥', '--- ---', '!!', '0 1 2 3', 'MSG_RETRY'])

@@ -41,7 +41,7 @@ Common controls: a time budget (the solver is *anytime* — it reports the best 
 
 Card pickers search by name and always submit exact card IDs, so ambiguous-name errors can't happen. Add a card twice to require two copies.
 
-**Stopping a run kills it** — the solver writes results only at phase boundaries, so a stopped run usually loses everything. The button warns before doing it.
+**Stopping a run is safe**: the Stop button asks the solver to finish up — it ends the search where it stands and writes every solution found so far, usually within a second or two. (A solver that doesn't respond is force-killed after a grace period.)
 
 ## Results
 
@@ -65,7 +65,7 @@ Card scripts update constantly upstream. A replay recorded *today* wants *today'
 | Card pickers greyed out | No usable card database — fix the EDOPro directory in Settings until the probe goes green. |
 | *Open in EDOPro* greyed out | The probe didn't find the EDOPro executable in the configured directory. |
 | `scripts not found (1): c0.lua` | Harmless — a placeholder card id with no script. |
-| Stopped run has no results | Expected — stopping kills the solver before it writes. Use `--rounds` (extra arguments) to make long runs checkpoint in stages. |
+| Stopped run has no results | The stop came before any solution existed (e.g. seconds into a hard board) — nothing to collect yet. |
 
 ## License
 

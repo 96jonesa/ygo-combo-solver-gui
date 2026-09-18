@@ -54,6 +54,11 @@ function commonFlags(common: CommonRunOptions): string[] {
   if (common.solveMs !== undefined) argv.push('--solve-ms', String(common.solveMs));
   if (common.threads !== undefined) argv.push('--threads', String(common.threads));
   if (common.seed !== undefined) argv.push('--seed', String(common.seed));
+  if (common.maxWritten !== undefined) argv.push('--max-written', String(common.maxWritten));
+  // Machine-readable @event lines: the parser consumes them first and falls
+  // back to report regexes. Solvers older than the fork's --json flag will
+  // reject this as an unknown option — the bundled solver is never older.
+  argv.push('--json');
   return argv;
 }
 

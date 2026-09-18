@@ -15,6 +15,8 @@ import { scanOutdir } from './results';
 import type { RunHandle, SolverRunner } from './runner';
 
 const LOG_FLUSH_MS = 50;
+// How long a graceful stop may take before the process is killed outright.
+const STOP_GRACE_MS = 10_000;
 
 /** The slice of HistoryStore the run manager needs (kept narrow for tests). */
 export interface RunRecorder {
@@ -44,6 +46,7 @@ interface ActiveRun {
   parserChanged: boolean;
   pendingLines: string[];
   flushTimer: NodeJS.Timeout | null;
+  graceTimer: NodeJS.Timeout | null;
   logStream: ReturnType<typeof createWriteStream>;
   stopRequested: boolean;
 }
@@ -93,6 +96,7 @@ export class RunManager {
       parserChanged: false,
       pendingLines: [],
       flushTimer: null,
+      graceTimer: null,
       logStream: createWriteStream(logPath),
       stopRequested: false,
     };
@@ -115,7 +119,9 @@ export class RunManager {
 
     run.handle.onLine((_stream, line) => {
       run.logStream.write(line + '\n');
-      run.pendingLines.push(line);
+      // @event lines feed the parser but stay out of the visible log; the
+      // full stream, events included, is always in log.txt.
+      if (!line.startsWith('@event ')) run.pendingLines.push(line);
       if (run.parser.feed(line)) run.parserChanged = true;
       run.flushTimer ??= setTimeout(() => this.flushLines(run), LOG_FLUSH_MS);
     });
@@ -128,7 +134,10 @@ export class RunManager {
     const run = this.active;
     if (run === null || run.runId !== runId || run.status !== 'running') return;
     run.stopRequested = true;
-    run.handle.kill();
+    // Graceful first: the solver finishes the run and writes what it found.
+    // A solver that doesn't answer within the grace window is killed.
+    run.handle.stop();
+    run.graceTimer ??= setTimeout(() => run.handle.kill(), STOP_GRACE_MS);
   }
 
   private flushLines(run: ActiveRun): void {
@@ -150,6 +159,10 @@ export class RunManager {
   }
 
   private onExit(run: ActiveRun, code: number | null): void {
+    if (run.graceTimer !== null) {
+      clearTimeout(run.graceTimer);
+      run.graceTimer = null;
+    }
     this.flushLines(run);
     run.logStream.end();
 

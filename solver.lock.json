@@ -1,7 +1,7 @@
 {
   "comment": "Pins the solver every bundled artifact must be built from. Windows exe and mac binary must come from the SAME commit (PRD \u00a79); scripts/build-solver.sh consumes this file.",
   "repo": "https://github.com/96jonesa/ygo-combo-solver",
-  "commit": "27e954b1933379246e46c88db4664ec7fed40f39",
+  "commit": "e0c7221802a23657d5a9a0b020025e0ceca04675",
   "scriptsCommit": "ff0443efd",
   "scriptsDate": "2026-04-13"
 }

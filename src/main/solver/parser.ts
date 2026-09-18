@@ -29,8 +29,60 @@ export class SolverOutputParser {
     return JSON.stringify(this.status) !== before;
   }
 
+  private applyEvent(e: Record<string, unknown>): void {
+    switch (e.type) {
+      case 'phase':
+        if (e.phase === 'loading' || e.phase === 'replay' || e.phase === 'search' || e.phase === 'output')
+          this.status.phase = e.phase;
+        break;
+      case 'health':
+        if (typeof e.msgRetry === 'number') this.status.msgRetry = e.msgRetry;
+        break;
+      case 'selfChecks':
+        if (typeof e.pass === 'boolean')
+          this.status.selfChecks = { pass: e.pass, detail: String(e.detail ?? '') };
+        break;
+      case 'seed':
+        if (typeof e.seed === 'number') this.status.seed = e.seed;
+        break;
+      case 'ladder':
+        if (typeof e.discrepancies === 'number' && typeof e.solutions === 'number')
+          this.status.ladder = { discrepancies: e.discrepancies, solutions: e.solutions };
+        break;
+      case 'written':
+        if (typeof e.written === 'number')
+          this.status.solutionsWritten = {
+            written: e.written,
+            candidates: typeof e.candidates === 'number' ? e.candidates : undefined,
+          };
+        break;
+      case 'fireVerdict':
+        if (typeof e.converted === 'number' && typeof e.windows === 'number')
+          this.status.fireVerdict = { converted: e.converted, windows: e.windows };
+        break;
+      case 'inert': {
+        const flags = String(e.flags ?? '');
+        if (flags !== '' && !this.status.inertFlags.includes(flags))
+          this.status.inertFlags.push(flags);
+        break;
+      }
+    }
+  }
+
   private consume(line: string): void {
     const trimmed = line.trim();
+
+    // Structured channel first (solver --json): "@event {...}" lines carry
+    // the same milestones as the report, without the wording fragility. A
+    // malformed event falls through to the regex path like any other line.
+    if (trimmed.startsWith('@event ')) {
+      try {
+        this.applyEvent(JSON.parse(trimmed.slice(7)) as Record<string, unknown>);
+        return;
+      } catch {
+        // fall through
+      }
+    }
 
     // Coarse phase from headers and section markers.
     if (trimmed === 'loading') {
@@ -70,10 +122,18 @@ export class SolverOutputParser {
       this.status.seed = Number(match[1]);
     }
 
-    if (trimmed.includes('!! INERT')) {
-      // Typical shape: "--foo ... !! INERT (reason)"; fall back to the line.
-      const flag = trimmed.match(/(--[a-z-]+)/)?.[1] ?? trimmed;
-      if (!this.status.inertFlags.includes(flag)) this.status.inertFlags.push(flag);
+    // INERT notices are advisory, not fatal — route them to the warning
+    // bucket, never to errors. Covers both "--foo ... !! INERT (reason)" and
+    // the solver's "!! REQUESTED but INERT here (...): <flags>" phrasing.
+    // (With --json the inert event already carried the clean flag; dedup
+    // absorbs any overlap.)
+    if (trimmed.includes('INERT')) {
+      const flag =
+        trimmed.match(/REQUESTED but INERT[^:]*:\s*(.+)$/)?.[1]?.trim() ??
+        trimmed.match(/(--[a-z-]+)/)?.[1] ??
+        trimmed.replace(/^!+\s*/, '');
+      if (flag !== '' && !this.status.inertFlags.includes(flag))
+        this.status.inertFlags.push(flag);
     } else if (trimmed.startsWith('!!')) {
       const message = trimmed.replace(/^!+\s*/, '');
       if (message.length > 0 && !this.status.errors.includes(message))
