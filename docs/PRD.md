@@ -2,7 +2,7 @@
 
 | Status | Author | Date | Tracking | Related |
 | --- | --- | --- | --- | --- |
-| Draft | Andy (with Claude) | 2026-08-30 | [YGO-5](https://linear.app/ygo-combo-solver-gui/issue/YGO-5/write-prd-for-cross-platform-ygo-combo-solver-gui) | [ygo-combo-solver](https://github.com/Armytille/ygo-combo-solver) |
+| Living (M0-M3 shipped; amended 2026-09-17) | Andy (with Claude) | 2026-08-30 | [YGO-5](https://linear.app/ygo-combo-solver-gui/issue/YGO-5/write-prd-for-cross-platform-ygo-combo-solver-gui) | [ygo-combo-solver](https://github.com/Armytille/ygo-combo-solver) |
 
 ## 1. Summary
 
@@ -49,7 +49,7 @@ Facts about the solver that constrain the GUI design (from a survey of the repo 
 - **No cancellation hook**: the solver has no graceful-stop mechanism. Killing the process loses all results, because solutions are written only at the end of a phase.
 - **Health gate**: a replay only reproduces under the card scripts contemporary with its recording. Under a mismatched script set the run silently continues on a *different duel*. The tell is the report line `MSG_RETRY: 0` (healthy) vs non-zero (broken). The solver also marks ineffective flags `!! INERT`.
 - **Exit codes**: `0` ok, `2` usage error, `1` load or health failure.
-- **Platforms**: the shipped binary is Windows x64 only. One file (`arena.cpp`, the snapshot allocator) hard-depends on Windows memory APIs (`VirtualAlloc`, `GetWriteWatch`). However, a complete **WebAssembly port exists** (local `web` branch, commit `c9b9821`): all 57 translation units compile under clang/emscripten, run at 0.88× native throughput, and the port's **Node target (`NODERAWFS`) runs on macOS today** with the identical CLI, reading a real EDOPro install from disk.
+- **Platforms**: upstream shipped Windows x64 only, with the platform-specific code confined to `arena.cpp` (the snapshot allocator). **Amendment 2026-09**: a native macOS (arm64) port now exists on [the fork](https://github.com/96jonesa/ygo-combo-solver) — mmap-based arena backing plus an mprotect/fault-handler dirty-page tracker — verified bit-faithful against the reference replay. The WebAssembly port referenced by earlier drafts (commit `c9b9821`, in upstream's pushed history) existed only to work around wasm's lack of dirty-page tracking and is no longer part of the plan.
 - **License**: AGPL-3.0-or-later (statically links ocgcore).
 
 ## 5. Product scope
@@ -182,8 +182,7 @@ The run manager owns the subprocess lifecycle, arg serialization (form → flags
 ### 7.4 Solver delivery
 
 - **Windows**: bundle the released `combosolver.exe` with the GUI installer (with its `LICENSE`/`NOTICE`), settings override for custom builds.
-- **macOS**: bundle the wasm build (`combosolver.wasm` + JS glue) and run it on Electron's Node. Requires building the wasm target from the solver's `web` branch (see risk in §9 — that branch is currently local-only) and rebasing it onto current master (it is ~8 commits behind and predates the French→English constraint-spelling rename).
-- **Long term**: a native macOS solver build (portable `arena.cpp` backend using `mmap`/`mprotect` plus the software write barrier the wasm arm already uses) removes the wasm dependency and the 4 GiB wasm memory ceiling. Tracked as an upstream ask, not a GUI blocker.
+- **macOS** (amended 2026-09, shipped): bundle the **native arm64 solver** built from the fork commit pinned in `solver.lock.json` via `scripts/build-solver.sh`; the runner drives it exactly like the Windows exe. The original wasm-on-Electron's-Node plan was dropped on the upstream author's advice — macOS supports dirty-page tracking natively, so the native port is both simpler and full speed.
 
 ## 8. Upstream asks (solver repo)
 
@@ -196,17 +195,17 @@ The GUI works against the solver as-is (subprocess + text scraping). These small
 
 None of these block MVP; #2 and #3 gate how good monitoring/cancellation can be.
 
+**Status 2026-09**: upstream went inactive after providing the (excellent) porting guidance on issue #2; the solver is now maintained on [Andy's fork](https://github.com/96jonesa/ygo-combo-solver), where the macOS port landed. Items #2 (graceful stop) and #3 (`--json`) are therefore no longer asks but candidate fork features.
+
 ## 9. Risks
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| `web` branch lost (local-only, unpushed) | macOS story collapses to "port arena.cpp first" | Push it now (§8.1); archive a bundle meanwhile |
 | Stdout format drift (repo rewords output; some strings still French) | Parsed status/summary breaks silently | Best-effort parsing, raw log always authoritative (§5.2.4); integration tests pinned to a solver version; upstream `--json` |
 | Script/replay version mismatch confuses users | "Wrong duel, no error" — solver's #1 documented hazard | Verify-first nudge, MSG_RETRY banner, per-run `--scriptdir` override (§5.2.1, §5.2.4) |
-| wasm build behind master (old flag spellings, 8 commits) | Mac and Windows behavior diverge | Rebase wasm build onto master before bundling; CI check that both artifacts come from the same solver commit |
 | Cancellation loses work | Users kill 30-minute runs and get nothing | Warn on stop; encourage `--rounds` splitting for long runs; upstream graceful stop |
 | AGPL-3.0 obligations (solver statically links ocgcore) | Distribution constraints on anything bundling the solver | Bundle = distribute: ship solver `LICENSE`/`NOTICE` and source links in the installer; simplest is licensing the GUI itself AGPL-compatible. Decide before first release (open question §11) |
-| wasm 4 GiB memory ceiling on macOS | Very large `--arena-mb`×threads configs won't fit | Default configs fit comfortably (measured ~160 MB working set at 16 threads); GUI caps mac presets; native port lifts it later |
+| Mac and Windows artifacts drift apart | Platforms diverge silently | `solver.lock.json` pins one commit for both; manifest beside each binary; CI same-commit check |
 
 ## 10. Milestones
 
@@ -220,12 +219,12 @@ None of these block MVP; #2 and #3 gate how good monitoring/cancellation can be.
 
 M0–M2 are Windows-first only because the native solver already exists there; the GUI code itself is platform-neutral throughout.
 
-## 11. Open questions
+## 11. Open questions — all resolved
 
-1. **GUI license**: AGPL the GUI too (simplest given bundling), or keep the GUI MIT and download the solver on first launch instead of bundling? Affects M4.
-2. **Solver upstream relationship**: can we land the upstream asks (§8) in `Armytille/ygo-combo-solver` directly, or do we maintain a fork?
-3. **wasm-on-Windows fallback**: bundle the wasm build on Windows too as a fallback (single delivery path, ~0.88× speed) or native-only? Leaning native for speed; decide at M3 when the wasm pipeline exists.
-4. Where does the verified solver binary/wasm artifact get built and stored — solver repo releases, or checked into this repo's release pipeline?
+1. **GUI license** — resolved 2026-09-17: **AGPL-3.0-or-later**, matching the bundled solver. LICENSE/NOTICE in the repo; solver licenses ship beside each bundled binary.
+2. **Solver upstream relationship** — resolved 2026-09-15: **fork** ([96jonesa/ygo-combo-solver](https://github.com/96jonesa/ygo-combo-solver)); upstream went inactive. An upstream PR remains possible if the owner resurfaces.
+3. **wasm-on-Windows fallback** — mooted: the wasm route was dropped entirely for the native macOS port.
+4. **Artifact pipeline** — resolved: artifacts are built from the fork commit pinned in `solver.lock.json` (`scripts/build-solver.sh` on macOS; same-commit `combosolver.exe` on Windows), never checked into git, bundled at package time with a provenance manifest.
 
 ## 12. Success criteria
 

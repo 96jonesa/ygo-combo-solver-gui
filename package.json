@@ -12,8 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package:mac": "electron-vite build && electron-builder --mac",
-    "package:win": "electron-vite build && electron-builder --win"
+    "package:mac": "npm run check:artifacts && electron-vite build && electron-builder --mac",
+    "package:win": "npm run check:artifacts && electron-vite build && electron-builder --win",
+    "check:artifacts": "node scripts/check-artifacts.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
