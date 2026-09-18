@@ -83,6 +83,14 @@ describe('SolverOutputParser', () => {
     expect(status.errors).toHaveLength(1);
   });
 
+  it('reads the enumerator coverage gap as a warning, not an error', () => {
+    const parser = new SolverOutputParser();
+    parser.feed('!! ENUMERATOR DOES NOT COVER THE LINE (154/156): any search explores an incomplete space');
+    const s = parser.snapshot();
+    expect(s.coverageGap).toEqual({ covered: 154, total: 156 });
+    expect(s.errors).toEqual([]);
+  });
+
   it('reads the fire verdict line', () => {
     const parser = new SolverOutputParser();
     parser.feed('=== --fire verdict: 4 window(s) out of 6 converted (3 full board, 1 without the sacrificed card) ===');

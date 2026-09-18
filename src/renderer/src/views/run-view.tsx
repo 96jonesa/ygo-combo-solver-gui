@@ -414,6 +414,15 @@ function HealthBanner() {
       </div>,
     );
   }
+  if (parsed.coverageGap !== undefined) {
+    const { covered, total } = parsed.coverageGap;
+    banners.push(
+      <div key="coverage" className="banner banner-warn">
+        ⚠ enumerator covers only {covered}/{total} of the line — the search space is incomplete
+        (usually a card the bundled engine can’t fully model). Results may miss cheaper lines.
+      </div>,
+    );
+  }
   if (parsed.inertFlags.length > 0) {
     banners.push(
       <div key="inert" className="banner banner-info">
