@@ -94,6 +94,43 @@ export function SettingsView() {
       </section>
 
       <section>
+        <h3>Card script override</h3>
+        <p className="hint">
+          A replay only reproduces under card scripts contemporary with its recording. Add script
+          directories here (highest priority first) to replay older recordings; they are passed as
+          --scriptdir and replace the workdir's own repositories scan.
+        </p>
+        {settings.scriptdirs.map((dir, index) => (
+          <div className="row" key={`${dir}-${index}`}>
+            <label>{index === 0 ? 'Directories' : ''}</label>
+            <input value={dir} readOnly />
+            <button
+              onClick={() =>
+                void save({
+                  ...settings,
+                  scriptdirs: settings.scriptdirs.filter((_, i) => i !== index),
+                })
+              }
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <div className="row">
+          <label>{settings.scriptdirs.length === 0 ? 'Directories' : ''}</label>
+          <button
+            onClick={() => {
+              void window.api.pickDirectory().then((d) => {
+                if (d !== null) void save({ ...settings, scriptdirs: [...settings.scriptdirs, d] });
+              });
+            }}
+          >
+            Add script directory…
+          </button>
+        </div>
+      </section>
+
+      <section>
         <h3>Solver</h3>
         <p className="hint">
           Leave unset to use the bundled solver. Point at your own <code>combosolver.exe</code> (or

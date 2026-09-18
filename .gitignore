@@ -1,5 +1,6 @@
 node_modules/
 out/
 dist/
+resources/solver/
 *.log
 .DS_Store

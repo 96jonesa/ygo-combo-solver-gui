@@ -12,10 +12,13 @@ import { LineSplitter } from './runner';
  * shape the M3 WasmRunner will use.
  */
 export class NativeRunner implements SolverRunner {
-  constructor(private readonly exePath: string) {}
+  constructor(
+    private readonly exePath: string,
+    private readonly solverCommit?: string,
+  ) {}
 
   describe() {
-    return { kind: 'native' as const, path: this.exePath };
+    return { kind: 'native' as const, path: this.exePath, solverCommit: this.solverCommit };
   }
 
   start(argv: string[], opts: { cwd: string }): RunHandle {
