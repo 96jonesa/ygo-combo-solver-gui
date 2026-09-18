@@ -27,6 +27,8 @@ npm run typecheck  # strict tsc
 npm run build      # production bundles into out/
 ```
 
+Releases are produced by `.github/workflows/release.yml`: pushing a version tag (`vX.Y.Z`, matching `package.json`) builds both installers — each with the solver compiled from the locked commit, gate-checked on Windows — and attaches them to a **draft** GitHub Release for manual review and publishing. A `workflow_dispatch` run of the same workflow is a dry run (workflow artifacts, no release).
+
 Solver artifacts are not checked in; `solver.lock.json` pins the [fork](https://github.com/96jonesa/ygo-combo-solver) commit they must be built from. On macOS, `scripts/build-solver.sh` builds the pinned solver (native arm64, requires a sibling `ygo-combo-solver` clone with its dependency layout — see that repo's README) and installs it under `resources/solver/mac/`, where the app picks it up automatically. On Windows, drop a `combosolver.exe` built from the same commit under `resources/solver/win/`. Without an artifact, point **Settings → Solver path** at `scripts/fake-solver.mjs` — a stand-in that emits solver-shaped output and writes fake solution files.
 
 ## What it does
