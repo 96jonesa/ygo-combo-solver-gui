@@ -8,14 +8,14 @@ Targets **macOS** and **Windows**.
 
 ## Status
 
-**In development — M2 (full MVP forms).** Merged so far: M0 (Electron skeleton: settings, EDOPro detection, solver spawning, live log streaming) and M1 (verify + cheaper-line workflows, health banners, live status, ranked results, run history). M2 adds the card picker over EDOPro's card databases and the remaining workflows: solve from another deck/hand, build a described board, and test against interruption. Design docs:
+**Feature-complete on macOS; release engineering (M4) in progress.** M0–M3 are merged: all five workflows, the card picker over EDOPro's databases, health banners, live status, ranked results with open-in-EDOPro, run history, and a natively ported solver ([fork](https://github.com/96jonesa/ygo-combo-solver)) bundled for macOS (arm64) with full dirty-page-tracking performance. The complete loop — record a duel in EDOPro, verify it, solve for cheaper lines, watch the solution back in EDOPro — works today. Remaining: Windows solver artifact + installer, mac signing/notarization. Design docs:
 
 | Document | Contents |
 | --- | --- |
 | [PRD](docs/PRD.md) | Goals, users, the five MVP workflows, feature requirements, platform strategy, risks, milestones |
 | [TDD](docs/TDD.md) | Electron architecture, solver-runner abstraction, argv serialization, stdout parser contract, storage, packaging, testing |
 
-Work is tracked in [Linear](https://linear.app/ygo-combo-solver-gui).
+Work is tracked in [Linear](https://linear.app/ygo-combo-solver-gui). End-user documentation lives in the [User Guide](docs/GUIDE.md).
 
 ## Development
 
@@ -29,7 +29,7 @@ npm run build      # production bundles into out/
 
 Solver artifacts are not checked in; `solver.lock.json` pins the [fork](https://github.com/96jonesa/ygo-combo-solver) commit they must be built from. On macOS, `scripts/build-solver.sh` builds the pinned solver (native arm64, requires a sibling `ygo-combo-solver` clone with its dependency layout — see that repo's README) and installs it under `resources/solver/mac/`, where the app picks it up automatically. On Windows, drop a `combosolver.exe` built from the same commit under `resources/solver/win/`. Without an artifact, point **Settings → Solver path** at `scripts/fake-solver.mjs` — a stand-in that emits solver-shaped output and writes fake solution files.
 
-## What the MVP will do
+## What it does
 
 - **Verify a replay** — health-check that a replay reproduces under your card scripts before spending a solve budget on it
 - **Find a cheaper line** — same end board, fewer cards spent
@@ -39,21 +39,21 @@ Solver artifacts are not checked in; `solver.lock.json` pins the [fork](https://
 
 Plus: live solver log with health/status parsing, ranked results with one-click open in EDOPro, run history with duplicate-and-tweak, and a raw extra-arguments escape hatch so the GUI is never less capable than the CLI.
 
-## How it works (planned)
+## How it works
 
-Electron + TypeScript. The GUI drives the solver as a black-box subprocess: serialize the form to CLI flags, stream its stdout live, then rank the `.yrp` files it writes. On Windows it spawns the native `combosolver.exe`; on macOS it runs the solver's WebAssembly build on Electron's bundled Node (≈0.9× native speed, identical CLI). The card picker reads your EDOPro install's own card databases, so cards are always submitted by exact passcode.
+Electron + TypeScript. The GUI drives the solver as a black-box subprocess: serialize the form to CLI flags, stream its stdout live, then rank the `.yrp` files it writes. Both platforms spawn a native solver binary built from the commit pinned in `solver.lock.json` — arm64 on macOS (ported in the [fork](https://github.com/96jonesa/ygo-combo-solver): mmap arena backing + an mprotect fault-handler dirty-page tracker), x64 on Windows. The card picker reads your EDOPro install's own card databases, so cards are always submitted by exact passcode.
 
 Requires a local [EDOPro (Project Ignis)](https://projectignis.github.io/) installation — the solver reads its card databases and scripts, and results open in it.
 
 ## Roadmap
 
-| Milestone | Contents |
-| --- | --- |
-| M0 | Electron skeleton: settings, EDOPro detection, solver spawn, raw log streaming (Windows) |
-| M1 | Core loop: verify + cheaper-line workflows, results, run history |
-| M2 | Remaining MVP forms: deck/hand, described board with card picker, interruption test |
-| M3 | macOS: wasm solver on Electron's Node, mac packaging |
-| M4 | Release: installers, license compliance, docs |
+| Milestone | Contents | Status |
+| --- | --- | --- |
+| M0 | Electron skeleton: settings, EDOPro detection, solver spawn, raw log streaming | done |
+| M1 | Core loop: verify + cheaper-line workflows, results, run history | done |
+| M2 | Remaining MVP forms: deck/hand, described board with card picker, interruption test | done |
+| M3 | macOS: natively ported solver, bundling + provenance | done |
+| M4 | Release: installers, license compliance, docs | in progress |
 
 ## License
 
