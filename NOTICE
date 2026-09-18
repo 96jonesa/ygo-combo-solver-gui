@@ -1,0 +1,30 @@
+ygo-combo-solver-gui
+Copyright (C) 2026 Andrew Jones
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. Full text in LICENSE.
+
+Source code: https://github.com/96jonesa/ygo-combo-solver-gui
+
+Recipients of a copy of this program, including over a network, are entitled
+to the corresponding source.
+
+--------------------------------------------------------------------------
+
+Bundled components:
+
+combosolver (ygo-combo-solver)
+  License: AGPL-3.0-or-later
+  Source:  https://github.com/96jonesa/ygo-combo-solver (fork; the commit each
+           bundled binary was built from is recorded in its manifest.json)
+  Upstream: https://github.com/Armytille/ygo-combo-solver
+  The solver statically links ocgcore (edo9300/ygopro-core, AGPL-3.0-or-later),
+  Lua (MIT), the LZMA SDK (public domain), and SQLite (public domain); its own
+  LICENSE and NOTICE files ship alongside each bundled binary under
+  resources/solver/.
+
+Major third-party dependencies (each under its own license):
+  Electron (MIT), React (MIT), zustand (MIT), sql.js (MIT),
+  electron-vite / Vite (MIT).

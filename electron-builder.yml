@@ -1,0 +1,40 @@
+# Packaging (TDD §13). Solver artifacts ride as extraResources so the main
+# process finds them at <resourcesPath>/solver/<platform>/ — the packaged
+# branch of bundledSolverPath — and each carries the solver's LICENSE/NOTICE
+# next to the binary (AGPL compliance, PRD §9).
+appId: io.github.96jonesa.ygo-combo-solver-gui
+productName: YGO Combo Solver
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+  - LICENSE
+  - NOTICE
+npmRebuild: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  category: public.app-category.utilities
+  # Unsigned for now (ad-hoc signature only): distributing outside the build
+  # machine will trip Gatekeeper until an Apple Developer identity +
+  # notarization are added. Tracked in YGO-11.
+  identity: null
+  extraResources:
+    - from: resources/solver/mac
+      to: solver/mac
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  extraResources:
+    - from: resources/solver/win
+      to: solver/win
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  license: LICENSE
