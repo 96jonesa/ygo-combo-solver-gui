@@ -73,6 +73,15 @@ npm run package:mac  # → dist/*.dmg
 npm run package:win  # → dist/*Setup*.exe
 ```
 
+## Updating to a new version
+
+There's no auto-updater yet — upgrading is a manual reinstall, and it keeps everything:
+
+- **Track A (installer)**: download the newer `.dmg` / `Setup.exe` from [Releases](https://github.com/96jonesa/ygo-combo-solver-gui/releases) and install it over the existing app (Windows: run the new installer; macOS: replace the app in Applications).
+- **Track B (source)**: `git pull`, then `npm install`, then rebuild/rebundle the solver only if `solver.lock.json` changed (`npm run check:artifacts` tells you — a FAIL means fetch/build the new pinned solver).
+
+Your settings, EDOPro path, and full run history live in the OS's app-data directory (`~/Library/Application Support/ygo-combo-solver-gui` on macOS, `%APPDATA%\ygo-combo-solver-gui` on Windows), untouched by a reinstall — so an upgrade never loses them.
+
 ## Step 3 — First-run setup (in the app)
 
 1. **Settings → EDOPro installation → Browse** to your install (`C:\ProjectIgnis` / `~/Applications/ProjectIgnis`). The probe panel should go green, report multiple databases and script directories, say **"EDOPro executable found"**, and show a card index of ~15,000+ cards. If the card count is tiny, EDOPro's first-run updater hasn't finished — launch EDOPro again and wait for it.
