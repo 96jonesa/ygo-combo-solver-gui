@@ -10,9 +10,7 @@ The app is a desktop frontend for [ygo-combo-solver](https://github.com/96jonesa
 
 ## Install
 
-1. **EDOPro first** — the app reads card databases and scripts from a local [EDOPro (Project Ignis)](https://projectignis.github.io/) installation, and results open in it. Install it and launch it once so its updater downloads the current card data.
-2. Install this app from the DMG (macOS) or installer (Windows).
-3. macOS note: the app is not yet notarized with Apple, so Gatekeeper may warn on first open — right-click the app and choose Open. (EDOPro itself greets you the same way.)
+See the [Installation & Setup guide](INSTALL.md) — it covers everything from a machine with no prerequisites to your first solve, on both platforms, with prebuilt-installer and build-from-source tracks.
 
 ## First-run setup (Settings tab)
 

@@ -1,6 +1,7 @@
 node_modules/
 out/
 dist/
-resources/solver/
+resources/solver/*
+!resources/solver/README.md
 *.log
 .DS_Store
