@@ -122,6 +122,15 @@ export class SolverOutputParser {
       this.status.seed = Number(match[1]);
     }
 
+    // Enumerator coverage gap: real correctness warning (the search can't
+    // generate every move in the line), but it doesn't fail the run, so it
+    // must surface on its own rather than via the self-checks banner.
+    let cov: RegExpMatchArray | null;
+    if ((cov = trimmed.match(/ENUMERATOR DOES NOT COVER THE LINE \((\d+)\/(\d+)\)/))) {
+      this.status.coverageGap = { covered: Number(cov[1]), total: Number(cov[2]) };
+      return;
+    }
+
     // INERT notices are advisory, not fatal — route them to the warning
     // bucket, never to errors. Covers both "--foo ... !! INERT (reason)" and
     // the solver's "!! REQUESTED but INERT here (...): <flags>" phrasing.

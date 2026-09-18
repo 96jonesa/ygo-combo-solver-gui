@@ -165,6 +165,8 @@ export interface ParsedStatus {
   solutionsWritten?: { written: number; candidates?: number };
   /** --fire runs: "=== --fire verdict: N window(s) out of M converted ===". */
   fireVerdict?: { converted: number; windows: number };
+  /** Enumerator coverage gap: the search space is incomplete (covered < total). */
+  coverageGap?: { covered: number; total: number };
 }
 
 export interface RunSummary {
