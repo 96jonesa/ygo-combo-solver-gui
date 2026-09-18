@@ -1,0 +1,189 @@
+# Release pipeline (YGO-17): on a version tag (vX.Y.Z, matching
+# package.json), build both installers — each with the solver compiled from
+# the commit pinned in solver.lock.json — and attach them to a DRAFT GitHub
+# Release for review and manual publishing.
+#
+# Each job rebuilds the solver itself (no cross-repo artifact downloads:
+# those need extra auth and expire); the Windows job also runs the solver's
+# cross-platform correctness gate before packaging.
+#
+# workflow_dispatch runs the same builds as a dry run: installers land as
+# workflow artifacts, no release is touched.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: gui
+
+      - name: Check tag matches package.json version
+        if: github.ref_type == 'tag'
+        working-directory: gui
+        run: |
+          v="v$(node -p "require('./package.json').version")"
+          if [ "$v" != "${GITHUB_REF_NAME}" ]; then
+            echo "tag ${GITHUB_REF_NAME} != package.json ${v}" >&2; exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Cache EDOPro sources
+        id: edopro-cache
+        uses: actions/cache@v4
+        with:
+          path: edopro
+          key: edopro-ocgcore-5a985af-lua
+
+      - name: Clone EDOPro sources
+        if: steps.edopro-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://github.com/edo9300/edopro edopro
+          git -C edopro submodule update --init ocgcore
+          git -C edopro/ocgcore fetch origin
+          git -C edopro/ocgcore submodule update --init lua/src
+
+      - name: Build solver at the locked commit
+        run: |
+          brew install premake
+          git clone https://github.com/96jonesa/ygo-combo-solver ygo-combo-solver
+          cd gui
+          SOLVER_SRC="$GITHUB_WORKSPACE/ygo-combo-solver" ./scripts/build-solver.sh
+
+      - name: Package DMG
+        working-directory: gui
+        run: |
+          npm ci
+          npm run package:mac
+
+      - name: Upload dry-run artifact
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-dry-run
+          path: gui/dist/*.dmg
+
+      - name: Attach to draft release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            gui/dist/*.dmg
+            gui/LICENSE
+            gui/NOTICE
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: gui
+
+      - name: Check tag matches package.json version
+        if: github.ref_type == 'tag'
+        working-directory: gui
+        run: |
+          $v = "v$(node -p "require('./package.json').version")"
+          if ($v -ne $env:GITHUB_REF_NAME) {
+            Write-Error "tag $env:GITHUB_REF_NAME != package.json $v"; exit 1
+          }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+
+      - name: Cache EDOPro sources
+        id: edopro-cache
+        uses: actions/cache@v4
+        with:
+          path: edopro
+          key: edopro-ocgcore-5a985af-lua
+
+      - name: Clone EDOPro sources
+        if: steps.edopro-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 https://github.com/edo9300/edopro edopro
+          git -C edopro submodule update --init ocgcore
+          git -C edopro/ocgcore fetch origin
+          git -C edopro/ocgcore submodule update --init lua/src
+
+      - name: premake5
+        run: |
+          Invoke-WebRequest https://github.com/premake/premake-core/releases/download/v5.0.0-beta8/premake-5.0.0-beta8-windows.zip -OutFile premake.zip
+          Expand-Archive premake.zip -DestinationPath premake5
+
+      - name: sqlite3 (vcpkg, static)
+        run: vcpkg install sqlite3:x64-windows-static
+
+      - name: Solver checkout at the locked commit
+        run: |
+          $commit = (Get-Content gui/solver.lock.json | ConvertFrom-Json).commit
+          git clone https://github.com/96jonesa/ygo-combo-solver ygo-combo-solver
+          git -C ygo-combo-solver checkout $commit
+          "SOLVER_COMMIT=$commit" | Out-File -Append $env:GITHUB_ENV
+
+      - name: Fetch solver deps
+        working-directory: ygo-combo-solver
+        run: |
+          $scripts = (Get-Content ../gui/solver.lock.json | ConvertFrom-Json).scriptsCommit
+          .\tools\fetch_solver_deps.ps1 -ScriptsCommit $scripts
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build solver (Release x64)
+        working-directory: ygo-combo-solver
+        run: |
+          ..\premake5\premake5.exe vs2022 --vcpkg-root=$env:VCPKG_INSTALLATION_ROOT
+          msbuild build\combosolver.sln /m /p:Configuration=Release /p:Platform=x64
+
+      - name: Correctness gate
+        working-directory: ygo-combo-solver
+        run: python tools/ci/gate.py --binary bin/Release/combosolver.exe --scripts ../deps/scripts_2026-04-13/script
+
+      - name: Install solver artifact
+        run: |
+          New-Item -ItemType Directory -Force gui/resources/solver/win | Out-Null
+          Copy-Item ygo-combo-solver/bin/Release/combosolver.exe gui/resources/solver/win/
+          Copy-Item ygo-combo-solver/LICENSE, ygo-combo-solver/NOTICE gui/resources/solver/win/
+          @{ solverCommit = "$env:SOLVER_COMMIT"; target = "x64-windows"; builtAt = (Get-Date -Format o) } |
+            ConvertTo-Json | Set-Content gui/resources/solver/win/manifest.json
+
+      - name: Package installer
+        working-directory: gui
+        run: |
+          npm ci
+          npm run package:win
+
+      - name: Upload dry-run artifact
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-dry-run
+          path: gui/dist/*.exe
+
+      - name: Attach to draft release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: gui/dist/*.exe
