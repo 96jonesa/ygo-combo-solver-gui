@@ -32,6 +32,9 @@ export function validateSpec(spec: RunSpec, opts: { checkPaths?: boolean } = {})
   const solveMs = spec.common.solveMs;
   if (solveMs !== undefined && (!Number.isFinite(solveMs) || solveMs < 1000))
     problems.push('budget must be at least 1 second');
+  const maxWritten = spec.common.maxWritten;
+  if (maxWritten !== undefined && (!Number.isInteger(maxWritten) || maxWritten < 1))
+    problems.push('max solutions must be a positive integer');
   const threads = spec.common.threads;
   if (threads !== undefined && (!Number.isInteger(threads) || threads < 1))
     problems.push('threads must be a positive integer');

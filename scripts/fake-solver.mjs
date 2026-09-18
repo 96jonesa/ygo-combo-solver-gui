@@ -49,7 +49,9 @@ if (fakeRetry > 0) {
 }
 console.log('  answers consumed    : 284 / 284');
 console.log('  MSG_RETRY           : 0   (faithful replay)');
+console.log('@event {"type":"health","msgRetry":0}');
 console.log('  seed: 888  (--seed 888 to replay)');
+console.log('@event {"type":"seed","seed":888}');
 if (fakeExit === 1) {
   console.log('!! arena init failed (simulated by --fake-exit 1)');
   process.exit(1);

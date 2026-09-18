@@ -54,10 +54,11 @@ export function RunView() {
   const [solveMs, setSolveMs] = useState(settings.defaults.solveMs);
   const [threads, setThreads] = useState<string>(settings.defaults.threads?.toString() ?? '');
   const [seed, setSeed] = useState('');
+  const [maxWritten, setMaxWritten] = useState('');
   const [extraArgs, setExtraArgs] = useState('');
   const [preview, setPreview] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [confirmStop, setConfirmStop] = useState(false);
+
   const [cardStatus, setCardStatus] = useState<CardIndexStatus | null>(null);
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export function RunView() {
     if (draft.common.solveMs !== undefined) setSolveMs(draft.common.solveMs);
     setThreads(draft.common.threads?.toString() ?? '');
     setSeed(draft.common.seed?.toString() ?? '');
+    setMaxWritten(draft.common.maxWritten?.toString() ?? '');
     setExtraArgs(draft.common.extraArgs ?? '');
     setDraft(null);
   }, [draft, setDraft]);
@@ -88,6 +90,7 @@ export function RunView() {
       solveMs,
       ...(threads !== '' && { threads: Number(threads) }),
       ...(seed !== '' && { seed: Number(seed) }),
+      ...(maxWritten !== '' && { maxWritten: Number(maxWritten) }),
       ...(extraArgs.trim() !== '' && { extraArgs }),
     };
     switch (kind) {
@@ -112,7 +115,7 @@ export function RunView() {
           common,
         };
     }
-  }, [kind, replay, deck, hand, targets, fire, fireSpare, oppHand, guards, solveMs, threads, seed, extraArgs]);
+  }, [kind, replay, deck, hand, targets, fire, fireSpare, oppHand, guards, solveMs, threads, seed, maxWritten, extraArgs]);
 
   // Debounced command preview from the same serializer that spawns.
   useEffect(() => {
@@ -148,20 +151,15 @@ export function RunView() {
         outdir: started.outdir,
         budgetMs: solveMs,
       });
-      setConfirmStop(false);
     } catch (e) {
       setError((e as Error).message);
     }
   };
 
+  // Graceful: the solver finishes up and writes what it found (a hard kill
+  // only fires if it doesn't answer within the grace window).
   const onStop = () => {
-    if (!run) return;
-    if (!confirmStop) {
-      setConfirmStop(true);
-      return;
-    }
-    void window.api.stopRun(run.runId);
-    setConfirmStop(false);
+    if (run) void window.api.stopRun(run.runId);
   };
 
   return (
@@ -296,6 +294,14 @@ export function RunView() {
             onChange={(e) => setSeed(e.target.value.replaceAll(/\D/g, ''))}
             placeholder="random"
           />
+          <label>Max solutions</label>
+          <input
+            className="narrow"
+            value={maxWritten}
+            onChange={(e) => setMaxWritten(e.target.value.replaceAll(/\D/g, ''))}
+            placeholder="16"
+            title="Ceiling of solutions written per run (each costs a verification re-replay)"
+          />
         </div>
         <div className="row">
           <label>Extra arguments</label>
@@ -318,7 +324,7 @@ export function RunView() {
             </button>
           ) : (
             <button className="danger" onClick={onStop}>
-              {confirmStop ? 'Really stop? In-progress results will be lost' : 'Stop'}
+              Stop & collect results
             </button>
           )}
           {run && <StatusBadge />}

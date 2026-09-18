@@ -28,7 +28,13 @@ export class NativeRunner implements SolverRunner {
           cwd: opts.cwd,
           env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
         })
-      : spawn(this.exePath, argv, { cwd: opts.cwd, windowsHide: true });
+      : spawn(this.exePath, argv, {
+          cwd: opts.cwd,
+          windowsHide: true,
+          // Own process group on Windows, so SIGBREAK (CTRL_BREAK) can reach
+          // it for the graceful stop.
+          detached: process.platform === 'win32',
+        });
 
     let lineCb: (stream: 'out' | 'err', line: string) => void = () => {};
     let exitCb: (code: number | null, signal: string | null) => void = () => {};
@@ -52,6 +58,12 @@ export class NativeRunner implements SolverRunner {
     return {
       onLine: (cb) => (lineCb = cb),
       onExit: (cb) => (exitCb = cb),
+      stop: () => {
+        if (child.pid === undefined || child.killed) return;
+        // The solver treats these as "budget expired": phases unwind through
+        // their normal exits and solutions found so far are written.
+        child.kill(process.platform === 'win32' ? 'SIGBREAK' : 'SIGTERM');
+      },
       kill: () => {
         if (child.pid === undefined || child.killed) return;
         if (process.platform === 'win32') {

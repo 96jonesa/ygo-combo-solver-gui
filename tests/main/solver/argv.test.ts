@@ -52,9 +52,18 @@ describe('splitExtraArgs', () => {
 });
 
 describe('buildArgv', () => {
-  it('puts the replay first with no flags for a bare verify', () => {
+  it('puts the replay first, with only --json, for a bare verify', () => {
     const spec: RunSpec = { kind: 'verify', replay: 'duel.yrpX', common: {} };
-    expect(buildArgv(spec)).toEqual(['duel.yrpX']);
+    expect(buildArgv(spec)).toEqual(['duel.yrpX', '--json']);
+  });
+
+  it('serializes maxWritten and keeps --json before extra args', () => {
+    const spec: RunSpec = {
+      kind: 'verify',
+      replay: 'duel.yrpX',
+      common: { maxWritten: 40, extraArgs: '--verbose' },
+    };
+    expect(buildArgv(spec)).toEqual(['duel.yrpX', '--max-written', '40', '--json', '--verbose']);
   });
 
   it('serializes common options in deterministic order', () => {
@@ -86,6 +95,7 @@ describe('buildArgv', () => {
       '8',
       '--seed',
       '888',
+      '--json',
     ]);
   });
 
@@ -101,6 +111,7 @@ describe('buildArgv', () => {
       '--optimize',
       '--solve-ms',
       '300000',
+      '--json',
     ]);
   });
 
@@ -122,6 +133,7 @@ describe('buildArgv', () => {
       'C:\\decks\\Lunalight.ydk',
       '--hand',
       '24094653|14558127|14558127',
+      '--json',
     ]);
   });
 
@@ -152,6 +164,7 @@ describe('buildArgv', () => {
       '90590304@grave',
       '--target',
       '27204311@szone:fd',
+      '--json',
     ]);
   });
 
@@ -175,6 +188,7 @@ describe('buildArgv', () => {
       '27204311',
       '--guard',
       '5:Crystal Wing|Zalen@field+Junk Signal@hand',
+      '--json',
     ]);
   });
 
@@ -188,6 +202,7 @@ describe('buildArgv', () => {
       'duel.yrpX',
       '--solve-ms',
       '120000',
+      '--json',
       '--solve',
       '--optimize',
     ]);
@@ -195,7 +210,7 @@ describe('buildArgv', () => {
 
   it('ignores whitespace-only extra arguments', () => {
     const spec: RunSpec = { kind: 'verify', replay: 'duel.yrpX', common: { extraArgs: '   ' } };
-    expect(buildArgv(spec)).toEqual(['duel.yrpX']);
+    expect(buildArgv(spec)).toEqual(['duel.yrpX', '--json']);
   });
 });
 

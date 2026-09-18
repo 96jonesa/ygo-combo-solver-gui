@@ -10,6 +10,9 @@ export interface SolverRunner {
 export interface RunHandle {
   onLine(cb: (stream: 'out' | 'err', line: string) => void): void;
   onExit(cb: (code: number | null, signal: string | null) => void): void;
+  /** Graceful stop: ask the solver to finish the run and write what it has. */
+  stop(): void;
+  /** Hard kill, the fallback when a stop request goes unanswered. */
   kill(): void;
 }
 

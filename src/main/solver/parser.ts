@@ -29,8 +29,60 @@ export class SolverOutputParser {
     return JSON.stringify(this.status) !== before;
   }
 
+  private applyEvent(e: Record<string, unknown>): void {
+    switch (e.type) {
+      case 'phase':
+        if (e.phase === 'loading' || e.phase === 'replay' || e.phase === 'search' || e.phase === 'output')
+          this.status.phase = e.phase;
+        break;
+      case 'health':
+        if (typeof e.msgRetry === 'number') this.status.msgRetry = e.msgRetry;
+        break;
+      case 'selfChecks':
+        if (typeof e.pass === 'boolean')
+          this.status.selfChecks = { pass: e.pass, detail: String(e.detail ?? '') };
+        break;
+      case 'seed':
+        if (typeof e.seed === 'number') this.status.seed = e.seed;
+        break;
+      case 'ladder':
+        if (typeof e.discrepancies === 'number' && typeof e.solutions === 'number')
+          this.status.ladder = { discrepancies: e.discrepancies, solutions: e.solutions };
+        break;
+      case 'written':
+        if (typeof e.written === 'number')
+          this.status.solutionsWritten = {
+            written: e.written,
+            candidates: typeof e.candidates === 'number' ? e.candidates : undefined,
+          };
+        break;
+      case 'fireVerdict':
+        if (typeof e.converted === 'number' && typeof e.windows === 'number')
+          this.status.fireVerdict = { converted: e.converted, windows: e.windows };
+        break;
+      case 'inert': {
+        const flags = String(e.flags ?? '');
+        if (flags !== '' && !this.status.inertFlags.includes(flags))
+          this.status.inertFlags.push(flags);
+        break;
+      }
+    }
+  }
+
   private consume(line: string): void {
     const trimmed = line.trim();
+
+    // Structured channel first (solver --json): "@event {...}" lines carry
+    // the same milestones as the report, without the wording fragility. A
+    // malformed event falls through to the regex path like any other line.
+    if (trimmed.startsWith('@event ')) {
+      try {
+        this.applyEvent(JSON.parse(trimmed.slice(7)) as Record<string, unknown>);
+        return;
+      } catch {
+        // fall through
+      }
+    }
 
     // Coarse phase from headers and section markers.
     if (trimmed === 'loading') {
