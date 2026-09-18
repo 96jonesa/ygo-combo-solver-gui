@@ -57,4 +57,4 @@ Requires a local [EDOPro (Project Ignis)](https://projectignis.github.io/) insta
 
 ## License
 
-Not yet chosen — the solver is AGPL-3.0-or-later, and how that shapes this repo's license is an open question tracked in the [PRD](docs/PRD.md#11-open-questions). Until a license file lands, all rights reserved.
+GNU Affero General Public License version 3 or later — matching the solver it bundles (which statically links ocgcore, also AGPL). Full text in [LICENSE](LICENSE), component notices in [NOTICE](NOTICE). Each bundled solver binary ships with the solver's own LICENSE/NOTICE beside it, and its manifest records the exact source commit it was built from.
