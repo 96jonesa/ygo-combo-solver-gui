@@ -285,7 +285,7 @@ export function RunView() {
             className="narrow"
             value={threads}
             onChange={(e) => setThreads(e.target.value.replaceAll(/\D/g, ''))}
-            placeholder="all cores"
+            placeholder="auto"
           />
           <label>Seed</label>
           <input
@@ -416,17 +416,24 @@ function HealthBanner() {
   }
   if (parsed.inertFlags.length > 0) {
     banners.push(
-      <div key="inert" className="banner banner-warn">
-        ⚠ ignored flags (INERT): {parsed.inertFlags.join(', ')}
+      <div key="inert" className="banner banner-info">
+        Some options had no effect in this mode: {parsed.inertFlags.join(', ')}
       </div>,
     );
   }
-  for (const error of parsed.errors) {
-    banners.push(
-      <div key={error} className="banner banner-bad">
-        !! {error}
-      </div>,
-    );
+  // The solver prefixes both fatal errors and advisory notices with "!!"
+  // (write-ceiling info, "scripts not found c0.lua", etc.). The reliable
+  // failure signal is the exit code, so only surface these diagnostics as
+  // errors once the run has actually failed — MSG_RETRY and the self-checks
+  // above cover health on a run that finished.
+  if (run?.status === 'failed') {
+    for (const error of parsed.errors) {
+      banners.push(
+        <div key={error} className="banner banner-bad">
+          !! {error}
+        </div>,
+      );
+    }
   }
   return banners.length > 0 ? <div className="banners">{banners}</div> : null;
 }

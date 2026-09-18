@@ -122,10 +122,18 @@ export class SolverOutputParser {
       this.status.seed = Number(match[1]);
     }
 
-    if (trimmed.includes('!! INERT')) {
-      // Typical shape: "--foo ... !! INERT (reason)"; fall back to the line.
-      const flag = trimmed.match(/(--[a-z-]+)/)?.[1] ?? trimmed;
-      if (!this.status.inertFlags.includes(flag)) this.status.inertFlags.push(flag);
+    // INERT notices are advisory, not fatal — route them to the warning
+    // bucket, never to errors. Covers both "--foo ... !! INERT (reason)" and
+    // the solver's "!! REQUESTED but INERT here (...): <flags>" phrasing.
+    // (With --json the inert event already carried the clean flag; dedup
+    // absorbs any overlap.)
+    if (trimmed.includes('INERT')) {
+      const flag =
+        trimmed.match(/REQUESTED but INERT[^:]*:\s*(.+)$/)?.[1]?.trim() ??
+        trimmed.match(/(--[a-z-]+)/)?.[1] ??
+        trimmed.replace(/^!+\s*/, '');
+      if (flag !== '' && !this.status.inertFlags.includes(flag))
+        this.status.inertFlags.push(flag);
     } else if (trimmed.startsWith('!!')) {
       const message = trimmed.replace(/^!+\s*/, '');
       if (message.length > 0 && !this.status.errors.includes(message))

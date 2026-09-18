@@ -114,6 +114,15 @@ describe('SolverOutputParser', () => {
       expect(s.inertFlags).toEqual(['reenter 0.50']);
     });
 
+    it('routes the solver\'s "REQUESTED but INERT" text line to warnings, not errors', () => {
+      // This exact phrasing used to land in the red error bucket.
+      const parser = new SolverOutputParser();
+      parser.feed('!! REQUESTED but INERT here (dependency absent in this mode): reenter 0.50');
+      const s = parser.snapshot();
+      expect(s.inertFlags).toEqual(['reenter 0.50']);
+      expect(s.errors).toEqual([]);
+    });
+
     it('falls back to the regex path on malformed events', () => {
       const parser = new SolverOutputParser();
       expect(() => parser.feed('@event {broken')).not.toThrow();
