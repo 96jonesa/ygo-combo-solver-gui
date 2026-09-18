@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HistoryView } from './views/history-view';
 import { RunView } from './views/run-view';
@@ -22,6 +22,10 @@ function App() {
   const appendLines = useAppStore((s) => s.appendLines);
   const setParsed = useAppStore((s) => s.setParsed);
   const updateStatus = useAppStore((s) => s.updateStatus);
+  const [update, setUpdate] = useState<{ latest: string; url: string } | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => window.api.onUpdateAvailable(setUpdate), []);
 
   useEffect(() => {
     void window.api.getSettings().then(async (loaded) => {
@@ -47,6 +51,20 @@ function App() {
 
   return (
     <div className="app">
+      {update !== null && !dismissed && (
+        <div className="update-bar">
+          <span>
+            Version {update.latest} is available.{' '}
+            <a href={update.url} target="_blank" rel="noreferrer">
+              Download
+            </a>{' '}
+            — installing over the top keeps your settings and history.
+          </span>
+          <button className="update-x" title="dismiss" onClick={() => setDismissed(true)}>
+            ×
+          </button>
+        </div>
+      )}
       <nav className="tabs">
         {TABS.map((t) => (
           <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>

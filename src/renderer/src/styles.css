@@ -523,3 +523,32 @@ button.danger {
   padding: 0.4rem 1rem;
   border-radius: 4px;
 }
+
+.update-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.9rem;
+  background: color-mix(in srgb, #4a7dff 22%, transparent);
+  font-size: 0.9rem;
+}
+
+.update-bar a {
+  color: inherit;
+  font-weight: 600;
+}
+
+.update-x {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.1rem;
+  opacity: 0.65;
+  padding: 0 0.3rem;
+}
+
+.update-x:hover {
+  opacity: 1;
+}
