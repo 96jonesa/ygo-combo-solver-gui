@@ -9,6 +9,12 @@ const api: RendererApi = {
   probeWorkdir: (path: string) => ipcRenderer.invoke(IpcChannels.workdirProbe, path),
   searchCards: (query: string) => ipcRenderer.invoke(IpcChannels.cardsSearch, query),
   cardStatus: () => ipcRenderer.invoke(IpcChannels.cardsStatus),
+  onUpdateAvailable: (cb: (info: { latest: string; url: string }) => void) => {
+    const listener = (_e: Electron.IpcRendererEvent, info: { latest: string; url: string }) =>
+      cb(info);
+    ipcRenderer.on(IpcChannels.updateAvailable, listener);
+    return () => ipcRenderer.removeListener(IpcChannels.updateAvailable, listener);
+  },
   previewRun: (spec: RunSpec) => ipcRenderer.invoke(IpcChannels.runPreview, spec),
   startRun: (spec: RunSpec) => ipcRenderer.invoke(IpcChannels.runStart, spec),
   stopRun: (runId: string) => ipcRenderer.invoke(IpcChannels.runStop, runId),

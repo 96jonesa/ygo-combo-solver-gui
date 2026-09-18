@@ -14,6 +14,7 @@ import { RunManager } from './solver/run-manager';
 import { validateSpec } from './solver/validate';
 import { HistoryStore } from './store/history';
 import { SettingsStore } from './store/settings';
+import { checkForUpdate } from './updates';
 import type { CardIndexStatus } from '../shared/types';
 
 const settingsStore = new SettingsStore(app.getPath('userData'));
@@ -187,6 +188,12 @@ function createWindow(): void {
   });
 
   registerIpc(window);
+
+  // Best-effort update check: notify the renderer if a newer release exists.
+  void checkForUpdate(app.getVersion()).then((info) => {
+    if (info !== null && !window.isDestroyed())
+      window.webContents.send(IpcChannels.updateAvailable, info);
+  });
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL);

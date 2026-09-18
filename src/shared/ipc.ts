@@ -17,6 +17,7 @@ export const IpcChannels = {
   workdirProbe: 'workdir:probe',
   cardsSearch: 'cards:search',
   cardsStatus: 'cards:status',
+  updateAvailable: 'update:available',
   runPreview: 'run:preview',
   runStart: 'run:start',
   runStop: 'run:stop',
@@ -46,6 +47,7 @@ export interface RendererApi {
   probeWorkdir(path: string): Promise<WorkdirHealth>;
   searchCards(query: string): Promise<CardHit[]>;
   cardStatus(): Promise<CardIndexStatus>;
+  onUpdateAvailable(cb: (info: { latest: string; url: string }) => void): () => void;
   previewRun(spec: RunSpec): Promise<RunPreview>;
   startRun(spec: RunSpec): Promise<StartResult>;
   stopRun(runId: string): Promise<void>;
