@@ -12,6 +12,10 @@ files:
   - LICENSE
   - NOTICE
 npmRebuild: false
+# Publishing is owned by the release workflow (draft release via
+# softprops/action-gh-release); electron-builder must never auto-publish,
+# which it otherwise attempts on CI and fails wanting a token.
+publish: null
 
 mac:
   target:
