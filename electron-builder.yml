@@ -22,10 +22,20 @@ mac:
     - target: dmg
       arch: [arm64]
   category: public.app-category.utilities
-  # Unsigned for now (ad-hoc signature only): distributing outside the build
-  # machine will trip Gatekeeper until an Apple Developer identity +
-  # notarization are added. Tracked in YGO-11.
-  identity: null
+  # AD-HOC signed: `"-"` signs the whole bundle (including the bundled solver)
+  # with no identity. NOT the same as `null`, which skips signing entirely —
+  # that shipped in v0.1.0 and v0.2.0: the bundle kept the stock Electron
+  # binary's signature, which no longer matched the renamed, repacked app, so
+  # every downloaded (quarantined) copy was reported "damaged" on arm64 Macs.
+  # The release workflow runs `codesign --verify --deep --strict` on the built
+  # app and fails if it does not hold.
+  #
+  # Ad-hoc is not a Developer ID: a downloaded copy still needs one approval on
+  # first launch (docs/INSTALL.md). Developer ID + notarization is YGO-11.
+  identity: "-"
+  # Off: the hardened runtime only matters for notarization, and with an ad-hoc
+  # signature library validation can refuse Electron's own framework at launch.
+  hardenedRuntime: false
   extraResources:
     - from: resources/solver/mac
       to: solver/mac
