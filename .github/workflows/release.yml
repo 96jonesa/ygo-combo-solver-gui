@@ -70,6 +70,16 @@ jobs:
           npm ci
           npm run package:mac
 
+      # v0.1.0 and v0.2.0 shipped with an invalid signature ("damaged" on every
+      # other Mac) because nothing checked it. Fail the release instead.
+      - name: Verify the app's signature
+        working-directory: gui
+        run: |
+          app=$(ls -d dist/mac-arm64/*.app)
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -q 'Identifier=io.github.96jonesa.ygo-combo-solver-gui' \
+            || { echo "the app is not signed as itself (still the stock Electron signature?)" >&2; exit 1; }
+
       - name: Upload dry-run artifact
         if: github.ref_type != 'tag'
         uses: actions/upload-artifact@v4

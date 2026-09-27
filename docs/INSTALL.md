@@ -19,7 +19,11 @@ The app reads card databases and scripts from a local [EDOPro (Project Ignis)](h
 ## Step 2, Track A — Prebuilt app (no developer tools)
 
 1. Download the installer for your platform from the [Releases page](https://github.com/96jonesa/ygo-combo-solver-gui/releases): the `.dmg` (macOS, Apple Silicon) or the `Setup.exe` (Windows).
-2. Expect the same unsigned-app friction as EDOPro's: macOS → right-click → Open; Windows SmartScreen → **More info → Run anyway**.
+2. Expect unsigned-app friction on first launch (the app isn't notarized with Apple yet):
+   - **macOS**: drag the app to Applications and open it. macOS says it "could not verify" the app — click **Done**, then go to **System Settings → Privacy & Security**, scroll to the message about YGO Combo Solver, and click **Open Anyway** (once). Terminal alternative: `xattr -dr com.apple.quarantine "/Applications/YGO Combo Solver.app"`.
+   - **Windows**: SmartScreen → **More info → Run anyway**.
+
+   **If macOS says the app "is damaged and can't be opened"**, you have v0.1.0 or v0.2.0 — those shipped with a broken signature. Install v0.2.1 or later.
 3. Install and launch, then skip to [Step 3](#step-3--first-run-setup-in-the-app).
 
 ## Step 2, Track B — From source
@@ -104,6 +108,7 @@ From here, the [User Guide](GUIDE.md) covers the workflows, reading results, and
 | "Electron failed to install correctly" | `node node_modules/electron/install.js`, then `npx electron --version`; blocked download → `ELECTRON_MIRROR` (see above) |
 | `rmdir`/delete of `node_modules` denied (Windows) | Close running app/editor/terminals holding it (check Task Manager for `node.exe`/`electron.exe`), retry |
 | `check:artifacts` FAIL | The binary in `resources/solver/<plat>/` wasn't built from the commit in `solver.lock.json` — fetch/build the matching one |
-| macOS "app might contain malware" | Unsigned, not malicious: right-click → Open (applies to EDOPro and, for now, this app) |
+| macOS "could not verify" / "might contain malware" | Not notarized, not malicious: System Settings → Privacy & Security → **Open Anyway** (applies to EDOPro too) |
+| macOS "is damaged and can't be opened" | v0.1.0/v0.2.0 shipped with a broken signature — install v0.2.1 or later |
 | Windows SmartScreen blocks the installer | More info → Run anyway (unsigned installer) |
 | Probe green but card index near zero | EDOPro's first-launch updater hasn't run — launch EDOPro, let it update, re-pick the directory |

@@ -12,7 +12,7 @@ Grab the latest installer from [**Releases**](https://github.com/96jonesa/ygo-co
 
 ## Status
 
-**Released — [v0.2.0](https://github.com/96jonesa/ygo-combo-solver-gui/releases/tag/v0.2.0), macOS and Windows.** All five workflows, card search over EDOPro's databases, health banners, live status, ranked results with open-in-EDOPro, run history, graceful stop that keeps results, and an in-app update notifier. The solver is maintained on a [fork](https://github.com/96jonesa/ygo-combo-solver) with a native macOS port; both platforms' binaries are built from one pinned commit and cross-checked by CI. Open items: installers are unsigned (macOS notarization would also unlock true auto-update), and improvements driven by tester feedback — showing the captured target board, and valuing cards kept in hand. Design docs:
+**Released — [v0.2.1](https://github.com/96jonesa/ygo-combo-solver-gui/releases/latest), macOS and Windows.** All five workflows, card search over EDOPro's databases, health banners, live status, ranked results with open-in-EDOPro, run history, graceful stop that keeps results, and an in-app update notifier. The solver is maintained on a [fork](https://github.com/96jonesa/ygo-combo-solver) with a native macOS port; both platforms' binaries are built from one pinned commit and cross-checked by CI. Open items: installers are ad-hoc signed but not notarized (notarization would also unlock true auto-update), and improvements driven by tester feedback — showing the captured target board, and valuing cards kept in hand. Design docs:
 
 | Document | Contents |
 | --- | --- |
